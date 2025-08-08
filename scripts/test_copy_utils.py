@@ -247,21 +247,7 @@ class TestCopier:
             else:
                 results['failed_copies'] += 1
 
-
-# Backward compatibility functions
-def get_modules_directory() -> Path:
-    """Backward compatibility function."""
-    manager = ModuleManager()
-    return manager.modules_dir
-
-
 def get_all_modules_with_tests() -> List[Tuple[Path, str]]:
     """Backward compatibility function."""
     manager = ModuleManager()
     return manager.get_all_modules_with_tests()
-
-
-def copy_module_tests(module_specs: List[str], tests_dir: Path, dry_run: bool = False, verbose: bool = False) -> Dict[str, any]:
-    """Backward compatibility function."""
-    copier = TestCopier()
-    return copier.copy_module_tests(module_specs, tests_dir, dry_run, verbose)

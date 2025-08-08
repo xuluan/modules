@@ -78,9 +78,10 @@ class TestEnvironment:
         env = os.environ.copy()
         
         env['GEODELITY_DIR'] = self.geodelity_dir
-        
-        current_dir = Path.cwd()
-        grun_dir = current_dir / 'grun'
+
+        script_dir = Path(__file__).parent
+        grun_dir = script_dir.parent / 'grun'
+
         env['GRUN_DIR'] = str(grun_dir.absolute())
         
         if self.debug:
@@ -141,6 +142,30 @@ class SingleTestRunner:
         self.test_env = test_env
         self.config_parser = JobConfigParser()
     
+    def _print_environment_info(self, env: Dict[str, str]) -> None:
+        """Print environment variables information in verbose mode."""
+        print("  📋 Environment variables:")
+        
+        # Key environment variables to display
+        key_vars = [
+            'GEODELITY_DIR',
+            'GRUN_DIR', 
+            'GDLOGGING_LEVEL',
+            'KEEPJOBFILES'
+        ]
+        
+        for var in key_vars:
+            if var in env:
+                value = env[var]
+                # Truncate very long paths for readability
+                if len(value) > 50:
+                    display_value = f"...{value[-47:]}"
+                else:
+                    display_value = value
+                print(f"    {var}={display_value}")
+        
+        print()
+    
     def run_test(self, job_file: Path, verbose: bool = False) -> TestResult:
         """Run a single test job file."""
         config = self.config_parser.parse_job_config(job_file)
@@ -149,6 +174,9 @@ class SingleTestRunner:
             print(f"Running {job_file.name} (timeout: {config.timeout}s, expected: {'pass' if config.pass_expected else 'fail'})")
         
         env = self.test_env.setup_environment()
+        
+        if verbose:
+            self._print_environment_info(env)
         
         env_script = f"{self.test_env.geodelity_dir}/etc/env.sh"
         grun_script = f"{self.test_env.geodelity_dir}/bin/grun.sh"
@@ -321,21 +349,6 @@ class TestOutputFormatter:
             for result in results:
                 status_text = "SUCCESS" if result.success else "FAILED"
                 print(f"  {result.status_symbol} {result.job_file}: {status_text} ({result.runtime:.1f}s)")
-
-
-# Backward compatibility functions
-def run_all_tests(tests_dir: Path, geodelity_dir: str, debug: bool = False, 
-                 keep_job_files: bool = False, verbose: bool = False) -> List[TestResult]:
-    """Backward compatibility function for running all tests."""
-    runner = TestRunner(geodelity_dir, debug, keep_job_files)
-    return runner.run_all_tests(tests_dir, verbose)
-
-
-def print_test_summary(results: List[TestResult], verbose: bool = False) -> None:
-    """Backward compatibility function for printing test summary."""
-    formatter = TestOutputFormatter()
-    formatter.print_test_summary(results, verbose)
-
 
 def validate_geodelity_dir(geodelity_dir: str) -> bool:
     """Backward compatibility function for validating GEODELITY_DIR."""
