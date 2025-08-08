@@ -1,0 +1,48 @@
+"name": "attrcalc",
+"version": "1.1.0",
+"use_mpi": false,
+"use_cuda": false,
+"attrname": {
+  "type": "argument",
+  "format": "text",
+  "required": true,
+  "repeatable": false,
+  "default": "ATTR1",
+  "width": "default",
+  "help": "Name of the attribute"
+},
+"type":{
+  "type": "choice",
+  "required": false,
+  "help": "The data type of the current attribute: int8, int16, int32, int64, float and double. It is not required, with float as default. For action: update, if it is not set, the previous data type will be kept.",
+  "format": "text",
+  "default": "float",
+  "options": [
+    "int8",
+    "int16",
+    "int32",
+    "int64",            
+    "float",
+    "double"  
+  ]
+},
+"action":{
+  "type": "choice",
+  "required": true,
+  "help": "There are three options: create, update, and remove. Create is the default option. Create will create a new attribute, update will modify an existing attribute, and remove will delete an existing attribute.",
+  "format": "text",
+  "default": "create",
+  "options": [
+    "create",
+    "update",
+    "remove"
+  ]
+},
+"expr": {
+  "type": "argument",
+  "format": "text",
+  "required": false,
+  "default": "",
+  "width": "full",
+  "help": "The expression calculates the attribute value, which can include the following operators: +, -, *, /, sin, cos, tan, (, ), as well as integers, floating-point numbers and attribute names. "
+}

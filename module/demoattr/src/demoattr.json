@@ -1,0 +1,12 @@
+"name": "demoattr",
+"version": "1.0.0",
+"use_mpi": false,
+"use_cuda": false,
+"fval": {
+  "type": "argument",
+  "format": "float",
+  "required": true,
+  "repeatable": false,
+  "width": "default",
+  "help": "A parameter of float type number"
+}

@@ -1,0 +1,171 @@
+"name": "testgendata",
+"version": "1.0.0",
+"use_mpi": false,
+"use_cuda": false,
+"primarykey": {
+"type": "procedure",
+"required": true,
+"repetable": false,
+"name": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "The name of the attribute of the primary key"
+},
+"first": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 1,
+    "width": "default",
+    "help": "The first primary key value"
+},
+"last": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 10,
+    "width": "default",
+    "help": "The last primary key value"
+},
+"step": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 1,
+    "width": "default",
+    "help": "The step size of the primary key values"
+}
+},
+"secondarykey": {
+"type": "procedure",
+"required": true,
+"repetable": false,
+"name": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "The name of the attribute of the secondary key"
+},
+"first": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 1,
+    "width": "default",
+    "help": "The first secondary key value"
+},
+"last": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 100,
+    "width": "default",
+    "help": "The last secondary key value"
+},
+"step": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 1,
+    "width": "default",
+    "help": "The step size of the secondary key value"
+}
+},
+"tracekey": {
+"type": "procedure",
+"required": true,
+"repetable": false,
+"name": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "Name of the attribute name of seismic data"
+},
+"tmin": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "float",
+    "default": 0,
+    "width": "default",
+    "help": "The first time of the time axis in milliseconds"
+},
+"tmax": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 5000,
+    "width": "default",
+    "help": "The last time of the time axis in milliseconds"
+},
+"unit": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "Unit of the seismic data"
+},  
+"sinterval": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 4000,
+    "width": "default",
+    "help": "Sampling interval time in microseconds"
+}
+},
+"attribute": {
+"type": "procedure",
+"required": true,
+"repetable": true,
+"name": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "Name of the attribute"
+},
+"type": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "default": 0,
+    "width": "default",
+    "help": "The attribute date type: int8, int16, int32, int65, float, double"
+},
+"length": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "int",
+    "default": 1,
+    "width": "default",
+    "help": "The attribute length"
+},
+"unit": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "Unit of the seismic data"
+}
+}
