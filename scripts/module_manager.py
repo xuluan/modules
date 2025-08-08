@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-Script to list modules and their versions, or build and install modules.
+Module management tool: list modules and their versions, or build and install modules.
 
 Usage:
     # List modules
-    python list_module_versions.py list                    # List all modules
-    python list_module_versions.py list attrcalc           # List specific module
-    python list_module_versions.py list attrcalc gendata   # List multiple modules
+    python module_manager.py --list                      # List all modules
+    python module_manager.py -l                          # List all modules (short form)
+    python module_manager.py --list --modules attrcalc   # List specific module
+    python module_manager.py -l -m attrcalc gendata      # List multiple modules
     
     # Build and install modules
-    python list_module_versions.py build                   # Build all modules
-    python list_module_versions.py build attrcalc          # Build specific module
-    python list_module_versions.py build attrcalc gendata  # Build multiple modules
+    python module_manager.py --build                     # Build all modules
+    python module_manager.py -b                          # Build all modules (short form)  
+    python module_manager.py --build --modules attrcalc  # Build specific module
+    python module_manager.py -b -m attrcalc gendata      # Build multiple modules
+    python module_manager.py -b -m attrcalc --no-confirm # Build without confirmation
 
 Functions Overview:
     Version-related functions:
@@ -468,27 +471,51 @@ def create_argument_parser():
         ArgumentParser configured for the script
     """
     parser = argparse.ArgumentParser(
-        description="List modules and their versions, or build and install modules.",
+        description="Manage modules: list versions or build and install modules.",
         epilog="Examples:\n"
-               "  %(prog)s list                    # List all modules\n"
-               "  %(prog)s list attrcalc           # List specific module\n"
-               "  %(prog)s list attrcalc gendata   # List multiple modules\n"
-               "  %(prog)s build                   # Build all modules\n"
-               "  %(prog)s build attrcalc          # Build specific module\n"
-               "  %(prog)s build attrcalc gendata  # Build multiple modules",
+               "  %(prog)s --list                           # List all modules\n"
+               "  %(prog)s --list --modules attrcalc        # List specific module\n"
+               "  %(prog)s --list -m attrcalc gendata       # List multiple modules\n"
+               "  %(prog)s --build                          # Build all modules\n"
+               "  %(prog)s --build --modules attrcalc       # Build specific module\n"
+               "  %(prog)s --build -m attrcalc gendata      # Build multiple modules\n"
+               "  %(prog)s -l -m attrcalc                   # Short form: list specific module\n"
+               "  %(prog)s -b -m attrcalc gendata           # Short form: build multiple modules",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
+    # Action group - exactly one required
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument(
+        '--list', '-l',
+        action='store_true',
+        help='List modules and their versions'
+    )
+    action_group.add_argument(
+        '--build', '-b',
+        action='store_true',
+        help='Build and install modules'
+    )
+    
+    # Module selection
     parser.add_argument(
-        'command',
-        choices=['list', 'build'],
-        help='Command to execute: list modules or build/install modules'
+        '--modules', '-m',
+        nargs='+',
+        metavar='MODULE',
+        help='Specific module names to process. If not specified, all modules will be processed.'
+    )
+    
+    # Additional options
+    parser.add_argument(
+        '--no-confirm',
+        action='store_true',
+        help='Skip confirmation prompt for build operations (use with caution)'
     )
     
     parser.add_argument(
-        'modules',
-        nargs='*',
-        help='Specific module names to process (default: process all modules)'
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
     )
     
     return parser
@@ -602,9 +629,9 @@ def main():
     # Get paths and target modules
     modules_dir = get_modules_directory()
     target_modules = args.modules if args.modules else None
-    command = args.command
     
-    if command == 'list':
+    # Determine the action based on flags
+    if args.list:
         # List modules and versions
         print_scan_header(target_modules, modules_dir)
         
@@ -620,35 +647,39 @@ def main():
         print_results_table(module_versions)
         print_summary(module_versions, target_modules)
         
-    elif command == 'build':
+    elif args.build:
         # Build and install modules
         print_build_header(target_modules, modules_dir)
         
-        # Confirm with user before proceeding with build
-        if target_modules:
-            confirmation_msg = f"Are you sure you want to build and install {len(target_modules)} module(s): {', '.join(target_modules)}?"
+        # Skip confirmation if --no-confirm flag is set
+        if not args.no_confirm:
+            # Confirm with user before proceeding with build
+            if target_modules:
+                confirmation_msg = f"Are you sure you want to build and install {len(target_modules)} module(s): {', '.join(target_modules)}?"
+            else:
+                # Get count of all modules
+                all_modules = get_module_versions(modules_dir, None)
+                module_count = len(all_modules)
+                confirmation_msg = f"Are you sure you want to build and install ALL {module_count} modules?"
+            
+            print(f"⚠️  {confirmation_msg}")
+            print("This will:")
+            print("  1. Run build-<module>.sh <version> for each module")
+            print("  2. Execute 'ninja install' in each module's mybuild directory")
+            print("  3. This may take a significant amount of time")
+            print()
+            
+            try:
+                response = input("Continue? [y/N]: ").strip().lower()
+            except KeyboardInterrupt:
+                print("\n\n🚫 Build cancelled by user.")
+                return
+            
+            if response not in ['y', 'yes']:
+                print("🚫 Build cancelled by user.")
+                return
         else:
-            # Get count of all modules
-            all_modules = get_module_versions(modules_dir, None)
-            module_count = len(all_modules)
-            confirmation_msg = f"Are you sure you want to build and install ALL {module_count} modules?"
-        
-        print(f"⚠️  {confirmation_msg}")
-        print("This will:")
-        print("  1. Run build-<module>.sh <version> for each module")
-        print("  2. Execute 'ninja install' in each module's mybuild directory")
-        print("  3. This may take a significant amount of time")
-        print()
-        
-        try:
-            response = input("Continue? [y/N]: ").strip().lower()
-        except KeyboardInterrupt:
-            print("\n\n🚫 Build cancelled by user.")
-            return
-        
-        if response not in ['y', 'yes']:
-            print("🚫 Build cancelled by user.")
-            return
+            print("🚀 Proceeding without confirmation (--no-confirm flag set)")
         
         # Proceed with build
         build_results = build_modules(modules_dir, target_modules)
