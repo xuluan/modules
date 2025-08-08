@@ -308,10 +308,21 @@ class TestOutputFormatter:
         print(f"  Result: {result.status_symbol} {result.status.value} ({result.runtime:.1f}s)")
         if result.error_msg:
             print(f"  Error: {result.error_msg}")
+        
+        # Show full stdout output in verbose mode
         if result.stdout and len(result.stdout.strip()) > 0:
-            print(f"  Stdout: {result.stdout.strip()[:100]}{'...' if len(result.stdout.strip()) > 100 else ''}")
+            print(f"  📤 Stdout:")
+            # Indent each line of stdout for better readability
+            for line in result.stdout.strip().split('\n'):
+                print(f"    {line}")
+        
+        # Show full stderr output in verbose mode
         if result.stderr and len(result.stderr.strip()) > 0:
-            print(f"  Stderr: {result.stderr.strip()[:100]}{'...' if len(result.stderr.strip()) > 100 else ''}")
+            print(f"  📥 Stderr:")
+            # Indent each line of stderr for better readability
+            for line in result.stderr.strip().split('\n'):
+                print(f"    {line}")
+        
         print()
     
     def print_test_summary(self, results: List[TestResult], verbose: bool = False) -> None:
