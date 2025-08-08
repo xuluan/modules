@@ -74,17 +74,13 @@ class ArgumentParserBuilder:
                    "  %(prog)s                                    # Copy all test files and run tests\n"
                    "  %(prog)s --modules module1                  # Copy from module1 and run tests\n"
                    "  %(prog)s -m module1 module2                # Copy from multiple modules and run tests\n"
-                   "  %(prog)s -m 'testexpected/test*'            # Copy test* files and run tests (NOTE: use quotes!)\n"
-                   "  %(prog)s -m 'testexpected/*1.0.0.job'      # Copy *1.0.0.job files and run tests (NOTE: use quotes!)\n"
-                   "  %(prog)s -m 'testexpected/*attr*'          # Copy *attr* files and run tests (NOTE: use quotes!)\n"
+                   "  %(prog)s -m testexpected/test*              # Copy test* files and run tests\n"
+                   "  %(prog)s -m testexpected/*1.0.0.job        # Copy *1.0.0.job files and run tests\n"
+                   "  %(prog)s -m testexpected/*attr*            # Copy *attr* files and run tests\n"
                    "  %(prog)s --clean                           # Clean tests directory first, then copy and run\n"
                    "  %(prog)s --dry-run                         # Show what would be copied (no tests run)\n"
                    "  %(prog)s --geo /path/to/geodelity           # Specify GEODELITY_DIR for test execution\n"
                    "  %(prog)s --debug --keepjob --verbose       # Run with debug logging, keep job files, and verbose output\n"
-                   "\n"
-                   "IMPORTANT: When using wildcards/patterns, always quote the module specification\n"
-                   "to prevent shell expansion. Use single or double quotes around patterns like:\n"
-                   "  'module/pattern*' or \"module/pattern*\"\n"
                    "\n"
                    "The tool always executes in this order: 1) Copy test files, 2) Run tests",
             formatter_class=argparse.RawDescriptionHelpFormatter
@@ -95,8 +91,7 @@ class ArgumentParserBuilder:
             nargs='+',
             metavar='MODULE_SPEC',
             help='Module specifications. Can be module names (e.g., "module1") or '
-                 'module with patterns (e.g., \'module1/test*\', \'module1/*1.0.0.job\'). '
-                 'IMPORTANT: Always quote patterns to prevent shell expansion! '
+                 'module with patterns (e.g., "module1/test*", "module1/*1.0.0.job"). '
                  'If not specified, all modules with test directories will be processed.'
         )
         

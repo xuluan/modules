@@ -62,13 +62,6 @@ class ModulePatternParser:
         if not module_spec:
             raise ValueError("Empty module specification")
         
-        # Check for potential shell expansion issues
-        # Only check for shell expansion if it looks like an expanded path, not a filename with dots
-        if (module_spec.startswith('./') or module_spec.startswith('/') or 
-            ('.' in module_spec.split('/')[-1] and not module_spec.split('/')[-1].endswith('.job'))):
-            raise ValueError(f"Looks like shell expanded a wildcard pattern. "
-                            f"Use quotes around patterns like 'module/pattern*' to prevent shell expansion. "
-                            f"Got: '{module_spec}'")
         
         if '/' not in module_spec:
             # Simple module name like "module1"
