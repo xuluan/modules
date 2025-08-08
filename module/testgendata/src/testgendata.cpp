@@ -162,7 +162,7 @@ void testgendata_init(const char* myid, const char* buf)
         std::fill(trc, trc + my_data->num_skey * my_data->trace_length, 0.f); 
 
 
-        auto& attrs = config["testexpect"]["attribute"];
+        auto& attrs = config["testgendata"]["attribute"];
         if(attrs.is_array()) {
             //parse attributes
             auto& arr = config["testgendata"]["attribute"].as_array();
