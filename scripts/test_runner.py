@@ -293,7 +293,9 @@ class TestRunner:
             results.append(result)
             
             if not verbose:
-                print(f"{result.status_symbol} ({result.runtime:.1f}s)")
+                expected_text = "PASS" if result.expected_pass else "FAIL"
+                actual_text = result.status.value
+                print(f"{result.status_symbol} Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
             elif verbose:
                 self.output_formatter.print_test_result(result)
         
@@ -305,7 +307,9 @@ class TestOutputFormatter:
     
     def print_test_result(self, result: TestResult) -> None:
         """Print detailed result for a single test."""
-        print(f"  Result: {result.status_symbol} {result.status.value} ({result.runtime:.1f}s)")
+        expected_text = "PASS" if result.expected_pass else "FAIL"
+        actual_text = result.status.value
+        print(f"  Result: {result.status_symbol} Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
         if result.error_msg:
             print(f"  Error: {result.error_msg}")
         
@@ -350,16 +354,20 @@ class TestOutputFormatter:
             print(f"\nFAILED TESTS:")
             for result in results:
                 if not result.success:
-                    reason = result.status.value
+                    expected_text = "PASS" if result.expected_pass else "FAIL"
+                    actual_text = result.status.value
+                    reason = f"Expected: {expected_text}, Actual: {actual_text}"
                     if result.error_msg:
                         reason += f" - {result.error_msg}"
-                    print(f"  {result.status_symbol} {result.job_file}: {reason}")
+                    print(f"  {result.status_symbol} {result.job_file}: {reason} ({result.runtime:.1f}s)")
         
         if verbose and results:
             print(f"\nALL TEST RESULTS:")
             for result in results:
+                expected_text = "PASS" if result.expected_pass else "FAIL"
+                actual_text = result.status.value
                 status_text = "SUCCESS" if result.success else "FAILED"
-                print(f"  {result.status_symbol} {result.job_file}: {status_text} ({result.runtime:.1f}s)")
+                print(f"  {result.status_symbol} {result.job_file}: {status_text} - Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
 
 def validate_geodelity_dir(geodelity_dir: str) -> bool:
     """Backward compatibility function for validating GEODELITY_DIR."""
