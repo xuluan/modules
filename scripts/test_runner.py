@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional
+
+
+class TestStatus(Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    TIMEOUT = "TIMEOUT"
+    ERROR = "ERROR"
+
+
+@dataclass
+class JobConfig:
+    pass_expected: bool = True
+    timeout: int = 300
+
+    @classmethod
+    def from_string(cls, config_str: str) -> 'JobConfig':
+        try:
+            config_dict = json.loads(config_str.lower())
+            return cls(
+                pass_expected=config_dict.get('pass', 'yes') in ['yes', 'true', True],
+                timeout=int(config_dict.get('timeout', 300))
+            )
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return cls()
+
+
+@dataclass
+class TestResult:
+    job_file: str
+    status: TestStatus
+    expected_pass: bool
+    runtime: float
+    timeout_limit: int
+    stdout: str = ""
+    stderr: str = ""
+    error_msg: str = ""
+
+    @property
+    def success(self) -> bool:
+        if self.expected_pass:
+            return self.status == TestStatus.PASS
+        else:
+            return self.status == TestStatus.FAIL
+
+    @property
+    def status_symbol(self) -> str:
+        if self.success:
+            return "✅"
+        elif self.status == TestStatus.TIMEOUT:
+            return "⏰"
+        elif self.status == TestStatus.ERROR:
+            return "💥"
+        else:
+            return "❌"
+
+
+class TestEnvironment:
+    """Manages test execution environment setup."""
+    
+    def __init__(self, geodelity_dir: str, debug: bool = False, keep_job_files: bool = False):
+        self.geodelity_dir = geodelity_dir
+        self.debug = debug
+        self.keep_job_files = keep_job_files
+
+    def setup_environment(self) -> Dict[str, str]:
+        """Setup environment variables for test execution."""
+        env = os.environ.copy()
+        
+        env['GEODELITY_DIR'] = self.geodelity_dir
+        
+        current_dir = Path.cwd()
+        grun_dir = current_dir / 'grun'
+        env['GRUN_DIR'] = str(grun_dir.absolute())
+        
+        if self.debug:
+            env['GDLOGGING_LEVEL'] = 'DEBUG'
+        
+        if self.keep_job_files:
+            env['KEEPJOBFILES'] = 'true'
+        
+        return env
+    
+    def validate_geodelity_dir(self) -> bool:
+        """Validate that GEODELITY_DIR exists and has required scripts."""
+        if not self.geodelity_dir:
+            return False
+        
+        geodelity_path = Path(self.geodelity_dir)
+        if not geodelity_path.exists():
+            print(f"Error: GEODELITY_DIR path does not exist: {self.geodelity_dir}")
+            return False
+        
+        env_script = geodelity_path / "etc" / "env.sh"
+        if not env_script.exists():
+            print(f"Error: Environment script not found: {env_script}")
+            return False
+        
+        grun_script = geodelity_path / "bin" / "grun.sh"
+        if not grun_script.exists():
+            print(f"Error: GRun script not found: {grun_script}")
+            return False
+        
+        return True
+
+
+class JobConfigParser:
+    """Parser for job configuration from job files."""
+    
+    @staticmethod
+    def parse_job_config(job_file: Path) -> JobConfig:
+        """Parse job configuration from the first line of a job file."""
+        try:
+            with open(job_file, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+                
+            if first_line.startswith('#'):
+                config_text = first_line[1:].strip()
+                if config_text:
+                    return JobConfig.from_string(config_text)
+        except (IOError, UnicodeDecodeError):
+            pass
+        
+        return JobConfig()
+
+
+class SingleTestRunner:
+    """Handles running individual test jobs."""
+    
+    def __init__(self, test_env: TestEnvironment):
+        self.test_env = test_env
+        self.config_parser = JobConfigParser()
+    
+    def run_test(self, job_file: Path, verbose: bool = False) -> TestResult:
+        """Run a single test job file."""
+        config = self.config_parser.parse_job_config(job_file)
+        
+        if verbose:
+            print(f"Running {job_file.name} (timeout: {config.timeout}s, expected: {'pass' if config.pass_expected else 'fail'})")
+        
+        env = self.test_env.setup_environment()
+        
+        env_script = f"{self.test_env.geodelity_dir}/etc/env.sh"
+        grun_script = f"{self.test_env.geodelity_dir}/bin/grun.sh"
+        
+        if not Path(env_script).exists():
+            return TestResult(
+                job_file=job_file.name,
+                status=TestStatus.ERROR,
+                expected_pass=config.pass_expected,
+                runtime=0.0,
+                timeout_limit=config.timeout,
+                error_msg=f"Environment script not found: {env_script}"
+            )
+        
+        if not Path(grun_script).exists():
+            return TestResult(
+                job_file=job_file.name,
+                status=TestStatus.ERROR,
+                expected_pass=config.pass_expected,
+                runtime=0.0,
+                timeout_limit=config.timeout,
+                error_msg=f"GRun script not found: {grun_script}"
+            )
+        
+        command = f'source "{env_script}" && "{grun_script}" "{job_file}"'
+        
+        start_time = time.time()
+        try:
+            result = subprocess.run(
+                ['bash', '-c', command],
+                env=env,
+                cwd=job_file.parent,
+                timeout=config.timeout,
+                capture_output=True,
+                text=True
+            )
+            runtime = time.time() - start_time
+            
+            status = TestStatus.PASS if result.returncode == 0 else TestStatus.FAIL
+            
+            return TestResult(
+                job_file=job_file.name,
+                status=status,
+                expected_pass=config.pass_expected,
+                runtime=runtime,
+                timeout_limit=config.timeout,
+                stdout=result.stdout,
+                stderr=result.stderr
+            )
+            
+        except subprocess.TimeoutExpired as e:
+            runtime = time.time() - start_time
+            return TestResult(
+                job_file=job_file.name,
+                status=TestStatus.TIMEOUT,
+                expected_pass=config.pass_expected,
+                runtime=runtime,
+                timeout_limit=config.timeout,
+                stdout=e.stdout.decode('utf-8') if e.stdout else "",
+                stderr=e.stderr.decode('utf-8') if e.stderr else "",
+                error_msg=f"Test timed out after {config.timeout} seconds"
+            )
+        
+        except Exception as e:
+            runtime = time.time() - start_time
+            return TestResult(
+                job_file=job_file.name,
+                status=TestStatus.ERROR,
+                expected_pass=config.pass_expected,
+                runtime=runtime,
+                timeout_limit=config.timeout,
+                error_msg=str(e)
+            )
+
+
+class TestRunner:
+    """Main test runner that coordinates test execution."""
+    
+    def __init__(self, geodelity_dir: str, debug: bool = False, keep_job_files: bool = False):
+        self.test_env = TestEnvironment(geodelity_dir, debug, keep_job_files)
+        self.single_runner = SingleTestRunner(self.test_env)
+        self.output_formatter = TestOutputFormatter()
+    
+    def find_job_files(self, tests_dir: Path) -> List[Path]:
+        """Find all job files in the tests directory."""
+        job_files = []
+        for job_file in tests_dir.glob('*.job'):
+            job_files.append(job_file)
+        return sorted(job_files)
+    
+    def validate_environment(self) -> bool:
+        """Validate test environment before running tests."""
+        return self.test_env.validate_geodelity_dir()
+    
+    def run_all_tests(self, tests_dir: Path, verbose: bool = False) -> List[TestResult]:
+        """Run all tests in the given directory."""
+        job_files = self.find_job_files(tests_dir)
+        if not job_files:
+            print(f"No .job files found in {tests_dir}")
+            return []
+        
+        results = []
+        total_tests = len(job_files)
+        
+        if verbose:
+            print(f"\nFound {total_tests} test(s) in {tests_dir}")
+            print("=" * 60)
+        
+        for i, job_file in enumerate(job_files, 1):
+            if not verbose:
+                print(f"[{i}/{total_tests}] {job_file.name}...", end=" ", flush=True)
+            
+            result = self.single_runner.run_test(job_file, verbose)
+            results.append(result)
+            
+            if not verbose:
+                print(f"{result.status_symbol} ({result.runtime:.1f}s)")
+            elif verbose:
+                self.output_formatter.print_test_result(result)
+        
+        return results
+
+
+class TestOutputFormatter:
+    """Handles formatting of test output and results."""
+    
+    def print_test_result(self, result: TestResult) -> None:
+        """Print detailed result for a single test."""
+        print(f"  Result: {result.status_symbol} {result.status.value} ({result.runtime:.1f}s)")
+        if result.error_msg:
+            print(f"  Error: {result.error_msg}")
+        if result.stdout and len(result.stdout.strip()) > 0:
+            print(f"  Stdout: {result.stdout.strip()[:100]}{'...' if len(result.stdout.strip()) > 100 else ''}")
+        if result.stderr and len(result.stderr.strip()) > 0:
+            print(f"  Stderr: {result.stderr.strip()[:100]}{'...' if len(result.stderr.strip()) > 100 else ''}")
+        print()
+    
+    def print_test_summary(self, results: List[TestResult], verbose: bool = False) -> None:
+        """Print summary of all test results."""
+        if not results:
+            return
+        
+        total = len(results)
+        successful = sum(1 for r in results if r.success)
+        failed = total - successful
+        
+        total_runtime = sum(r.runtime for r in results)
+        
+        print("\n" + "=" * 60)
+        print("TEST SUMMARY")
+        print("=" * 60)
+        
+        print(f"Total tests: {total}")
+        print(f"Successful:  {successful} ✅")
+        print(f"Failed:      {failed} ❌")
+        print(f"Success rate: {successful/total*100:.1f}%")
+        print(f"Total runtime: {total_runtime:.1f}s")
+        
+        if failed > 0:
+            print(f"\nFAILED TESTS:")
+            for result in results:
+                if not result.success:
+                    reason = result.status.value
+                    if result.error_msg:
+                        reason += f" - {result.error_msg}"
+                    print(f"  {result.status_symbol} {result.job_file}: {reason}")
+        
+        if verbose and results:
+            print(f"\nALL TEST RESULTS:")
+            for result in results:
+                status_text = "SUCCESS" if result.success else "FAILED"
+                print(f"  {result.status_symbol} {result.job_file}: {status_text} ({result.runtime:.1f}s)")
+
+
+# Backward compatibility functions
+def run_all_tests(tests_dir: Path, geodelity_dir: str, debug: bool = False, 
+                 keep_job_files: bool = False, verbose: bool = False) -> List[TestResult]:
+    """Backward compatibility function for running all tests."""
+    runner = TestRunner(geodelity_dir, debug, keep_job_files)
+    return runner.run_all_tests(tests_dir, verbose)
+
+
+def print_test_summary(results: List[TestResult], verbose: bool = False) -> None:
+    """Backward compatibility function for printing test summary."""
+    formatter = TestOutputFormatter()
+    formatter.print_test_summary(results, verbose)
+
+
+def validate_geodelity_dir(geodelity_dir: str) -> bool:
+    """Backward compatibility function for validating GEODELITY_DIR."""
+    env = TestEnvironment(geodelity_dir)
+    return env.validate_geodelity_dir()
