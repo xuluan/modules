@@ -26,13 +26,39 @@ class JobConfig:
     @classmethod
     def from_string(cls, config_str: str) -> 'JobConfig':
         try:
+            # First try direct JSON parsing
             config_dict = json.loads(config_str.lower())
-            return cls(
-                pass_expected=config_dict.get('pass', 'yes') in ['yes', 'true', True],
-                timeout=int(config_dict.get('timeout', 300))
-            )
         except (json.JSONDecodeError, ValueError, TypeError):
-            return cls()
+            try:
+                # Try to convert JavaScript-style object to JSON
+                # Handle formats like {pass: no, timeout: 300}
+                normalized_str = cls._normalize_config_string(config_str)
+                config_dict = json.loads(normalized_str.lower())
+            except (json.JSONDecodeError, ValueError, TypeError):
+                return cls()
+        
+        return cls(
+            pass_expected=config_dict.get('pass', 'yes') in ['yes', 'true', True],
+            timeout=int(config_dict.get('timeout', 300))
+        )
+    
+    @classmethod
+    def _normalize_config_string(cls, config_str: str) -> str:
+        """Convert JavaScript-style object notation to valid JSON."""
+        import re
+        
+        # Remove leading/trailing whitespace
+        config_str = config_str.strip()
+        
+        # Add quotes around unquoted keys
+        # Pattern matches: word characters followed by colon
+        config_str = re.sub(r'(\w+):', r'"\1":', config_str)
+        
+        # Add quotes around unquoted string values (but not numbers)
+        # Pattern matches: colon followed by whitespace and word characters (not numbers)
+        config_str = re.sub(r':\s*([a-zA-Z][a-zA-Z0-9]*)', r': "\1"', config_str)
+        
+        return config_str
 
 
 @dataclass
