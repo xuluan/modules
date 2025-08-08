@@ -11,6 +11,7 @@ This tool provides a unified interface for:
 import argparse
 import os
 import sys
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
@@ -23,40 +24,43 @@ class TestDirectoryManager:
     
     def __init__(self):
         self.tests_dir = self._get_tests_directory()
+        self.grun_dir = self._get_grun_directory()
     
     def _get_tests_directory(self) -> Path:
         """Get the tests directory path relative to the script location."""
         script_dir = Path(__file__).parent
         return script_dir.parent / "tests"
+
+    def _get_grun_directory(self) -> Path:
+        """Get the grun directory path relative to the script location."""
+        script_dir = Path(__file__).parent
+        return script_dir.parent / "grun"        
     
-    def clean_tests_directory(self, dry_run: bool = False, verbose: bool = False) -> int:
-        """Clean the tests directory by removing all files."""
-        if not self.tests_dir.exists():
-            return 0
-        
-        removed_count = 0
-        
-        for file_path in self.tests_dir.iterdir():
-            if file_path.is_file():
-                if dry_run:
-                    if verbose:
-                        print(f"  📋 Would remove: {file_path.name}")
-                else:
-                    try:
-                        file_path.unlink()
-                        if verbose:
-                            print(f"  🗑️  Removed: {file_path.name}")
-                    except Exception as e:
-                        print(f"  ❌ Failed to remove {file_path.name}: {e}")
-                        continue
-                removed_count += 1
-        
-        return removed_count
+    def clean_directory(self, dry_run: bool = False, verbose: bool = False) -> int:
+        """Clean the tests and grun directory by removing all files."""
+        count = 0
+        if dry_run:
+            if verbose:
+                print(f"  📋 Would remove: {self.tests_dir}")            
+                print(f"  📋 Would remove: {self.grun_dir}") 
+            return 2
 
 
+        if self.tests_dir.exists():
+            if verbose:
+                print(f"  🗑️  Removed: {self.tests_dir}")               
+            shutil.rmtree(self.tests_dir)
+            count += 1
 
+        if self.grun_dir.exists():
+            if verbose:
+                print(f"  🗑️  Removed: {self.grun_dir}")               
+            shutil.rmtree(self.grun_dir)
+            count += 1
 
-
+        self.tests_dir.mkdir(parents=True, exist_ok=True)
+        self.grun_dir.mkdir(parents=True, exist_ok=True)
+        return count
 
 class ArgumentParserBuilder:
     """Builds and configures command line argument parser."""
@@ -262,11 +266,10 @@ class TestCopyMode:
             )
         
         # Clean tests directory if requested
-        if args.clean:
-            self._handle_clean_operation(args)
-            # If only cleaning (no modules specified), exit here
-            if args.modules is None:
-                return
+        
+        self._handle_clean_operation(args)
+        if args.clean: # only clean, and quit
+            sys.exit(1)
         
         # Copy test files
         self._handle_copy_operation(module_specs, args)
@@ -292,10 +295,10 @@ class TestCopyMode:
     
     def _handle_clean_operation(self, args) -> None:
         """Handle directory cleaning operation."""
-        removed_count = self.directory_manager.clean_tests_directory(args.dry_run, args.verbose)
+        removed_count = self.directory_manager.clean_directory(args.dry_run, args.verbose)
         if removed_count > 0:
             action = "Would remove" if args.dry_run else "Removed"
-            print(f"✅ {action} {removed_count} file(s)")
+            print(f"✅ {action} {removed_count} folder(s)")
         else:
             print("✅ No files to remove")
     
