@@ -201,7 +201,7 @@ class SingleTestRunner:
                 error_msg=f"GRun script not found: {grun_script}"
             )
         
-        command = f'source "{env_script}" && "{grun_script}" "{job_file}"'
+        command = f'source "{env_script}" && "{grun_script}" "{job_file.name}"'
         
         start_time = time.time()
         try:

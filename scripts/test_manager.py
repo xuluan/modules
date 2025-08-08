@@ -65,26 +65,24 @@ class ArgumentParserBuilder:
     def create_argument_parser() -> argparse.ArgumentParser:
         """Create and configure the command line argument parser."""
         parser = argparse.ArgumentParser(
-            description="Test management tool: copy and run test job files.",
+            description="Test management tool: copy test job files and run tests.",
             epilog="Examples:\n"
-                   "  # Copy operations:\n"
-                   "  %(prog)s                                    # Copy all test files from all modules\n"
-                   "  %(prog)s --modules module1                  # Copy all files from module1/test/\n"
-                   "  %(prog)s -m module1 module2                # Copy from multiple modules\n"
-                   "  %(prog)s -m 'testexpected/test*'            # Copy test* files (NOTE: use quotes!)\n"
-                   "  %(prog)s -m 'testexpected/*1.0.0.job'      # Copy *1.0.0.job files (NOTE: use quotes!)\n"
-                   "  %(prog)s -m 'testexpected/*attr*'          # Copy *attr* files (NOTE: use quotes!)\n"
-                   "  %(prog)s --clean                           # Clean tests directory first\n"
-                   "  %(prog)s --dry-run                         # Show what would be done\n"
-                   "\n"
-                   "  # Run tests:\n"
-                   "  %(prog)s --run --geo /path/to/geodelity     # Run all tests in tests directory\n"
-                   "  %(prog)s --run -g /path/to/geodelity        # Same as above\n"
-                   "  %(prog)s --run --debug --keepjob           # Run with debug logging and keep job files\n"
+                   "  %(prog)s                                    # Copy all test files and run tests\n"
+                   "  %(prog)s --modules module1                  # Copy from module1 and run tests\n"
+                   "  %(prog)s -m module1 module2                # Copy from multiple modules and run tests\n"
+                   "  %(prog)s -m 'testexpected/test*'            # Copy test* files and run tests (NOTE: use quotes!)\n"
+                   "  %(prog)s -m 'testexpected/*1.0.0.job'      # Copy *1.0.0.job files and run tests (NOTE: use quotes!)\n"
+                   "  %(prog)s -m 'testexpected/*attr*'          # Copy *attr* files and run tests (NOTE: use quotes!)\n"
+                   "  %(prog)s --clean                           # Clean tests directory first, then copy and run\n"
+                   "  %(prog)s --dry-run                         # Show what would be copied (no tests run)\n"
+                   "  %(prog)s --geo /path/to/geodelity           # Specify GEODELITY_DIR for test execution\n"
+                   "  %(prog)s --debug --keepjob --verbose       # Run with debug logging, keep job files, and verbose output\n"
                    "\n"
                    "IMPORTANT: When using wildcards/patterns, always quote the module specification\n"
                    "to prevent shell expansion. Use single or double quotes around patterns like:\n"
-                   "  'module/pattern*' or \"module/pattern*\"",
+                   "  'module/pattern*' or \"module/pattern*\"\n"
+                   "\n"
+                   "The tool always executes in this order: 1) Copy test files, 2) Run tests",
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
         
@@ -116,12 +114,6 @@ class ArgumentParserBuilder:
             help='Enable verbose output'
         )
         
-        # Test running arguments
-        parser.add_argument(
-            '--run', '-r',
-            action='store_true',
-            help='Run tests instead of copying files'
-        )
         
         parser.add_argument(
             '--geo', '-g',
@@ -358,8 +350,13 @@ class TestManager:
         """Main entry point for the test manager."""
         parser = self.argument_parser.create_argument_parser()
         args = parser.parse_args()
+        
+        # Always execute copy first
         self.copy_mode.copy_tests_mode(args)
-        self.runner_mode.run_tests_mode(args)
+        
+        # Run tests only if not in dry-run mode
+        if not args.dry_run:
+            self.runner_mode.run_tests_mode(args)
 
 
 def main():
