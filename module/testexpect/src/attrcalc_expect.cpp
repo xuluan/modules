@@ -53,9 +53,7 @@ bool check_data_complex_1(Testexpect* my_data, std::string&  attr_name, AttrData
     for(int i = 0; i < length; ++i) {
         double inl = static_cast<double>(pinline[i]);
         double cro = static_cast<double>(pcrossline[i]);
-        //double c = std::sin( (inl + cro) * 0.1) ;
         double c = std::sin( (inl + cro) * 0.1) + std::cos(inl * 0.2) * std::sin ( std::tan(cro));
-        // double c = std::sin( (inl + cro) * 0.1)+ std::cos(inl * 0.2) * std::sin ( std::tan(cro));
 #if DEBUG_DUMP        
         printf(" %d, %d, %d, %f == %f \n", i, pinline[i], pcrossline[i], c, dst[i]);
 #endif        

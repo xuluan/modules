@@ -5,7 +5,7 @@
 #include <string>
 #include "ArrowStore.h"
 
-#define DEBUG_DUMP 1
+#define DEBUG_DUMP 0
 
 #if DEBUG_DUMP
 void pdump(char* p, size_t len);
