@@ -81,7 +81,7 @@ void testgendata_init(const char* myid, const char* buf)
         my_data->trace_name = tracekey.at("name", "tracekey").as_string();
         gutl::UTL_StringToUpperCase(my_data->trace_name);
 
-        my_data->trace_unit = tracekey.at("unit", "tracekey").as_string();
+        my_data->trace_unit = "ms"; //tracekey.at("unit", "tracekey").as_string();
 
         my_data->tmin = tracekey.at("tmin", "tracekey").as_float();
         my_data->tmax = tracekey.at("tmax", "tracekey").as_float();
@@ -174,7 +174,7 @@ void testgendata_init(const char* myid, const char* buf)
                 attr_config.name = arr[i].at("name", "attribute").as_string();
                 gutl::UTL_StringToUpperCase(attr_config.name);
 
-                attr_config.unit = arr[i].at("unit", "attribute").as_string();
+                attr_config.unit = ""; // arr[i].at("unit", "attribute").as_string();
                 attr_config.length = arr[i].at("length", "attribute").as_int();
 
                 std::string data_type = arr[i].at("data", "attribute").as_map().begin()->first;

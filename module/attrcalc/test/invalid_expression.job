@@ -1,59 +1,59 @@
-# {"pass":"no"}
+# {pass: no, timeout: 300}
+# Test invalid expressions - should fail parsing
 - testgendata:
     version: '1.0.0'
     primarykey:
       name: 'inline'
       first: 1
-      last: 10
+      last: 2
       step: 1
     secondarykey:
       name: 'crossline'
       first: 1
-      last: 10
+      last: 2
       step: 1
     tracekey:
       name: 'samples'
       tmin: 0
-      tmax: 5000
-      length: 16
+      tmax: 1000
+      length: 4
       unit: ms
       data:
         random:
           type: float
           min: -1
-          max: 1          
+          max: 1
     attribute:
+# Test with unbalanced parentheses - should fail
 - attrcalc:
     version: '1.1.0'
-    attrname: 'ATTR1'
+    attrname: 'INVALID_ATTR'
     type: 'float'
     action: 'create'
-    expr: 'inline+samples*2.7'                  
+    expr: 'INLINE + (CROSSLINE * 2'
 - testexpect:
     version: '1.0.0'
     primarykey:
       name: 'inline'
       first: 1
-      last: 10
+      last: 2
       step: 1
     secondarykey:
       name: 'crossline'
       first: 1
-      last: 10
+      last: 2
       step: 1
     tracekey:
       name: 'samples'
       tmin: 0
-      tmax: 5000
-      length: 16
+      tmax: 1000
+      length: 4
       unit: ms
       type: float
       pattern: SAME
     attribute:
-    - name: attr1
+    - name: INVALID_ATTR
       unit: m
       length: 1
       type: float
-      pattern: 'INLINE+CROSSline*2.7'
-
-
+      pattern: 'skip'        

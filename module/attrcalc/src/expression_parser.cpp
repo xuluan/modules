@@ -465,7 +465,7 @@ bool ExpressionEvaluator::evaluate_node(const ExpressionNode* node,
         
         case NodeType::BINARY_OP: {
             // We need additional temporary storage for binary operations
-            static std::vector<double> left_temp, right_temp;
+            std::vector<double> left_temp, right_temp;
             AttrData left_attr, right_attr;
             AttrData* left_result = nullptr;
             AttrData* right_result = nullptr;
@@ -503,7 +503,7 @@ bool ExpressionEvaluator::evaluate_node(const ExpressionNode* node,
         }
         
         case NodeType::UNARY_OP: {
-            static std::vector<double> operand_temp;
+            std::vector<double> operand_temp;
             AttrData operand_attr;
             AttrData* operand_result = nullptr;
             

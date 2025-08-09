@@ -5,7 +5,7 @@
 #include <string>
 #include "ArrowStore.h"
 
-#define DEBUG_DUMP 0
+#define DEBUG_DUMP 1
 
 #if DEBUG_DUMP
 void pdump(char* p, size_t len);
@@ -14,7 +14,9 @@ void pdump(char* p, size_t len);
 enum class CheckPattern {
     SKIP,  //dont check, default: skip
     SAME,  //no change : same
-    ATTRCALC_PLUS_MUL //  : ATTRCALC_INLINE+CROSSLINE*2.7
+    ATTRCALC_PLUS_MUL, //  INLINE+CROSSLINE*2.7
+    ATTRCALC_COMPLEX_1, //  SIN((INLINE + CROSSLINE) * 0.1) + COS(INLINE * 0.2) * sin(tan(CROSSLINE))
+    CHECK_PATTERN_NUM
 };
 
 std::string to_string(CheckPattern c);

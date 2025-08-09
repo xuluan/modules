@@ -15,11 +15,12 @@
 #include "common_expect.h"
 #include "attrcalc_expect.h"
 
-
+#define FLOAT_EPSILON_TIMES 100
+#define DUMP_MAX_LEN 64
 
 #if DEBUG_DUMP
 void pdump(char* p, size_t len) {
-    if(len > 64) len = 64;
+    if(len > DUMP_MAX_LEN) len = DUMP_MAX_LEN;
     for (int i = 0; i < len; i += 16) {
         printf("%08x: ", i);
         for (int j = 0; j < 16; j++) {
@@ -43,7 +44,9 @@ std::string to_string(CheckPattern c) {
     switch(c) {
         case CheckPattern::SAME:    return "SAME";
         case CheckPattern::SKIP:    return "SKIP";
-        case CheckPattern::ATTRCALC_PLUS_MUL:  return "ATTRCALC_INLINE+CROSSLINE*2.7";
+        case CheckPattern::ATTRCALC_PLUS_MUL:  return "ATTRCALC_PLUS_MUL";
+        case CheckPattern::ATTRCALC_COMPLEX_1:  return "ATTRCALC_COMPLEX_1";
+
         default:  throw std::runtime_error("Error CheckPattern");
     }
 }
@@ -53,18 +56,20 @@ CheckPattern to_checkpattern(std::string s) {
         return CheckPattern::SAME;
     } else if(s == "SKIP") {
         return CheckPattern::SKIP;
-    } else if(s == "ATTRCALC_INLINE+CROSSLINE*2.7") {
+    } else if(s == "ATTRCALC_PLUS_MUL") {
         return CheckPattern::ATTRCALC_PLUS_MUL;
+    } else if(s == "ATTRCALC_COMPLEX_1") {
+        return CheckPattern::ATTRCALC_COMPLEX_1;
     } else {
         throw std::runtime_error("Unknown CheckPattern  : " + s);
     }
 }
 
-void load_data (std::vector<char>& data, const std::string& file_name, size_t length) {
+bool load_data (std::vector<char>& data, const std::string& file_name, size_t length) {
     data.resize (length);
     std::ifstream file (file_name, std::ios::binary);
     if (!file) {
-        throw std::runtime_error ("load_data: cannot open file:" + file_name);
+        return false;
     }
     file.read (data.data (), length);
 
@@ -74,6 +79,7 @@ void load_data (std::vector<char>& data, const std::string& file_name, size_t le
         "expect:" + std::to_string (length));
     }
     file.close();
+    return true;
 }
 
 CheckPattern get_pattern(std::string  attr_name, std::vector<AttrConfig>& attrs)
@@ -114,7 +120,7 @@ void* get_and_check_data_valid(Testexpect* my_data, std::string  attr_name, int 
 }
 
 bool is_equal_float_double(float a, double b) {
-    const float epsilon = std::numeric_limits<float>::epsilon() * 100;
+    const float epsilon = std::numeric_limits<float>::epsilon() * FLOAT_EPSILON_TIMES;
     
     double diff = std::fabs(static_cast<double>(a) - b);
     
@@ -130,6 +136,8 @@ bool check_data(Testexpect* my_data, std::string  attr_name, AttrData& attr_data
             return check_data_skip(my_data, attr_name, attr_data, variables);            
         case CheckPattern::ATTRCALC_PLUS_MUL:  
             return check_data_plus_mul(my_data, attr_name, attr_data, variables);
+        case CheckPattern::ATTRCALC_COMPLEX_1:  
+            return check_data_complex_1(my_data, attr_name, attr_data, variables);            
         default:  
             throw std::runtime_error("check_data fail: Error CheckPattern");
     }
@@ -193,7 +201,7 @@ void testexpect_init(const char* myid, const char* buf)
         my_data->trace_name = tracekey.at("name", "tracekey").as_string();
         gutl::UTL_StringToUpperCase(my_data->trace_name);
 
-        my_data->trace_unit = tracekey.at("unit", "tracekey").as_string();
+        my_data->trace_unit = "ms"; //tracekey.at("unit", "tracekey").as_string();
 
         my_data->tmin = tracekey.at("tmin", "tracekey").as_float();
         my_data->tmax = tracekey.at("tmax", "tracekey").as_float();
@@ -227,7 +235,7 @@ void testexpect_init(const char* myid, const char* buf)
                 std::string pattern = arr[i].at("pattern", "attribute").as_string();
                 gutl::UTL_StringToUpperCase(pattern);
 
-                my_data->attrs.emplace_back(name, arr[i].at("unit", "attribute").as_string()
+                my_data->attrs.emplace_back(name, "" //arr[i].at("unit", "attribute").as_string()
                     , arr[i].at("length", "attribute").as_int()
                     , as::string_to_data_format(arr[i].at("type", "attribute").as_string())
                     , to_checkpattern(pattern)); 
@@ -429,11 +437,15 @@ void testexpect_process(const char* myid)
         
         // load data
         for(int i = 0; i < my_data->attrs.size(); ++i) {
-            if(my_data->attrs[i].check_pattern == CheckPattern::ATTRCALC_PLUS_MUL)
-                continue;
-            load_data(my_data->attrs[i].data, my_data->attrs[i].name + ".DAT", grp_size * my_data->attrs[i].length * as::get_data_format_size(my_data->attrs[i].type));
-            data = static_cast<void*>(my_data->attrs[i].data.data());
-            variables.emplace(my_data->attrs[i].name, AttrData(data, (size_t)my_data->attrs[i].length * grp_size, my_data->attrs[i].type));
+            //if(my_data->attrs[i].check_pattern == CheckPattern::ATTRCALC_PLUS_MUL)
+            //    continue;
+            bool b = load_data(my_data->attrs[i].data, my_data->attrs[i].name + ".DAT", grp_size * my_data->attrs[i].length * as::get_data_format_size(my_data->attrs[i].type));
+            if(b) {
+                data = static_cast<void*>(my_data->attrs[i].data.data());
+                variables.emplace(my_data->attrs[i].name, AttrData(data, (size_t)my_data->attrs[i].length * grp_size, my_data->attrs[i].type));
+            } else {
+                gd_logger.LogDebug(my_logger, "Load data faile, attr {}", my_data->attrs[i].name);
+            }
         }
 
         //check attributes

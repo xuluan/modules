@@ -1,3 +1,5 @@
+# {pass: yes, timeout: 300}
+# Test complex nested expressions with parentheses
 - testgendata:
     version: '1.0.0'
     primarykey:
@@ -13,21 +15,21 @@
     tracekey:
       name: 'samples'
       tmin: 0
-      tmax: 5000
-      length: 16
+      tmax: 1000
+      length: 64
       unit: ms
       data:
         random:
           type: float
           min: -1
-          max: 1          
+          max: 1
     attribute:
 - attrcalc:
     version: '1.1.0'
-    attrname: 'ATTR1'
+    attrname: 'COMPLEX_EXPR'
     type: 'float'
     action: 'create'
-    expr: 'inline+CROSSLINE*2.7'                  
+    expr: 'SIN((INLINE + CROSSLINE) * 0.1) + COS(INLINE * 0.2) * sin(tan(CROSSLINE))'
 - testexpect:
     version: '1.0.0'
     primarykey:
@@ -43,16 +45,14 @@
     tracekey:
       name: 'samples'
       tmin: 0
-      tmax: 5000
-      length: 16
+      tmax: 1000
+      length: 64
       unit: ms
       type: float
       pattern: SAME
     attribute:
-    - name: attr1
-      unit: m
+    - name: COMPLEX_EXPR
+      unit: ''
       length: 1
       type: float
-      pattern: 'INLINE+CROSSline*2.7'
-
-
+      pattern: 'attrcalc_complex_1'

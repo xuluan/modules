@@ -1,0 +1,66 @@
+# {pass: no, timeout: 300}
+# Test creating duplicate attribute names - should fail
+- testgendata:
+    version: '1.0.0'
+    primarykey:
+      name: 'inline'
+      first: 1
+      last: 2
+      step: 1
+    secondarykey:
+      name: 'crossline'
+      first: 1
+      last: 2
+      step: 1
+    tracekey:
+      name: 'samples'
+      tmin: 0
+      tmax: 1000
+      length: 4
+      unit: ms
+      data:
+        random:
+          type: float
+          min: -1
+          max: 1
+    attribute:
+# Create first attribute
+- attrcalc:
+    version: '1.1.0'
+    attrname: 'DUPLICATE_TEST'
+    type: 'float'
+    action: 'create'
+    expr: 'INLINE + CROSSLINE'
+# Try to create same attribute again - should fail
+- attrcalc:
+    version: '1.1.0'
+    attrname: 'DUPLICATE_TEST'
+    type: 'float'
+    action: 'create'
+    expr: 'INLINE * CROSSLINE'
+- testexpect:
+    version: '1.0.0'
+    primarykey:
+      name: 'inline'
+      first: 1
+      last: 2
+      step: 1
+    secondarykey:
+      name: 'crossline'
+      first: 1
+      last: 2
+      step: 1
+    tracekey:
+      name: 'samples'
+      tmin: 0
+      tmax: 1000
+      length: 4
+      unit: ms
+      type: float
+      pattern: SAME
+    attribute:
+    - name: DUPLICATE_TEST
+      unit: m
+      length: 1
+      type: float
+      pattern: 'skip'    
