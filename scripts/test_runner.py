@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -322,6 +323,8 @@ class TestRunner:
                 expected_text = "PASS" if result.expected_pass else "FAIL"
                 actual_text = result.status.value
                 print(f"{result.status_symbol} Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
+                # Show error logs in non-verbose mode too
+                self.output_formatter.print_error_logs(result)
             elif verbose:
                 self.output_formatter.print_test_result(result)
         
@@ -331,6 +334,51 @@ class TestRunner:
 class TestOutputFormatter:
     """Handles formatting of test output and results."""
     
+    def extract_error_logs(self, output_text: str) -> List[str]:
+        """Extract error log lines from output text."""
+        if not output_text:
+            return []
+        
+        error_lines = []
+        # Patterns to match different types of error logs:
+        patterns = [
+            # Pattern 1: HH:MM:SS.microseconds [pid] ERROR message
+            r'\d{2}:\d{2}:\d{2}\.\d+\s+\[\d+\]\s+(ERROR|FATAL|CRITICAL)\s+.*',
+            # Pattern 2: More flexible timestamp with ERROR/FATAL/CRITICAL
+            r'\d{2}:\d{2}:\d{2}[.\d]*\s*\[?\d*\]?\s*(ERROR|FATAL|CRITICAL)\s+.*',
+            # Pattern 3: Simple ERROR/FATAL/CRITICAL at beginning of line
+            r'^(ERROR|FATAL|CRITICAL):\s+.*',
+            # Pattern 4: Lines containing "Error:" or "error:"
+            r'.*[Ee]rror:\s+.*',
+            # Pattern 5: Exception traces
+            r'.*(Exception|Error)\s*:.*',
+            # Pattern 6: Failed/failure messages
+            r'.*(Failed|failed|FAILED)\s+.*'
+        ]
+        
+        for line in output_text.split('\n'):
+            line_stripped = line.strip()
+            if line_stripped:
+                for pattern in patterns:
+                    if re.search(pattern, line_stripped):
+                        error_lines.append(line_stripped)
+                        break  # Don't match same line multiple times
+        
+        return error_lines
+    
+    def print_error_logs(self, result: TestResult) -> None:
+        """Print extracted error logs separately."""
+        # Extract errors from both stdout and stderr
+        all_errors = []
+        all_errors.extend(self.extract_error_logs(result.stdout))
+        all_errors.extend(self.extract_error_logs(result.stderr))
+        
+        if all_errors:
+            print(f"  🚨 Error Logs:")
+            for error_line in all_errors:
+                print(f"    {error_line}")
+            print()
+    
     def print_test_result(self, result: TestResult) -> None:
         """Print detailed result for a single test."""
         expected_text = "PASS" if result.expected_pass else "FAIL"
@@ -338,6 +386,9 @@ class TestOutputFormatter:
         print(f"  Result: {result.status_symbol} Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
         if result.error_msg:
             print(f"  Error: {result.error_msg}")
+        
+        # Show extracted error logs first (most important)
+        self.print_error_logs(result)
         
         # Show full stdout output in verbose mode
         if result.stdout and len(result.stdout.strip()) > 0:
@@ -387,7 +438,21 @@ class TestOutputFormatter:
                         reason += f" - {result.error_msg}"
                     print(f"  {result.status_symbol} {result.job_file}: {reason} ({result.runtime:.1f}s)")
         
-        if verbose and results:
+        # Show error logs summary for failed tests only
+        failed_test_error_logs = []
+        for result in results:
+            if not result.success:  # Only collect errors from failed tests
+                errors = self.extract_error_logs(result.stdout)
+                errors.extend(self.extract_error_logs(result.stderr))
+                if errors:
+                    failed_test_error_logs.extend([(result.job_file, error) for error in errors])
+        
+        if failed_test_error_logs:
+            print(f"\n🚨 ERROR LOGS FROM FAILED TESTS ({len(failed_test_error_logs)} total):")
+            for job_file, error_line in failed_test_error_logs:
+                print(f"  [{job_file}] {error_line}")
+        
+        if results:
             print(f"\nALL TEST RESULTS:")
             for result in results:
                 expected_text = "PASS" if result.expected_pass else "FAIL"
