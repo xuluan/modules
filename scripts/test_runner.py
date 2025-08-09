@@ -6,10 +6,11 @@ import re
 import subprocess
 import sys
 import time
+import yaml
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 class TestStatus(Enum):
@@ -20,9 +21,19 @@ class TestStatus(Enum):
 
 
 @dataclass
+class ModuleInfo:
+    name: str
+    version: str
+
+@dataclass
 class JobConfig:
     pass_expected: bool = True
     timeout: int = 300
+    modules: List[ModuleInfo] = None
+    
+    def __post_init__(self):
+        if self.modules is None:
+            self.modules = []
 
     @classmethod
     def from_string(cls, config_str: str) -> 'JobConfig':
@@ -69,9 +80,14 @@ class TestResult:
     expected_pass: bool
     runtime: float
     timeout_limit: int
+    modules: List[ModuleInfo] = None
     stdout: str = ""
     stderr: str = ""
     error_msg: str = ""
+    
+    def __post_init__(self):
+        if self.modules is None:
+            self.modules = []
 
     @property
     def success(self) -> bool:
@@ -148,6 +164,9 @@ class JobConfigParser:
     @staticmethod
     def parse_job_config(job_file: Path) -> JobConfig:
         """Parse job configuration from the first line of a job file."""
+        config = JobConfig()
+        
+        # Parse first line configuration (existing functionality)
         try:
             with open(job_file, 'r', encoding='utf-8') as f:
                 first_line = f.readline().strip()
@@ -155,11 +174,58 @@ class JobConfigParser:
             if first_line.startswith('#'):
                 config_text = first_line[1:].strip()
                 if config_text:
-                    return JobConfig.from_string(config_text)
+                    config = JobConfig.from_string(config_text)
         except (IOError, UnicodeDecodeError):
             pass
         
-        return JobConfig()
+        # Parse YAML content for module information
+        modules = JobConfigParser.parse_yaml_modules(job_file)
+        config.modules = modules
+        
+        return config
+    
+    @staticmethod
+    def parse_yaml_modules(job_file: Path) -> List[ModuleInfo]:
+        """Parse YAML job file to extract module names and versions."""
+        modules = []
+        
+        try:
+            with open(job_file, 'r', encoding='utf-8') as f:
+                # Skip first line if it's a comment
+                content = f.read()
+                lines = content.split('\n')
+                if lines and lines[0].strip().startswith('#'):
+                    yaml_content = '\n'.join(lines[1:])
+                else:
+                    yaml_content = content
+                
+            # Parse YAML content
+            yaml_data = yaml.safe_load(yaml_content)
+            
+            if isinstance(yaml_data, list):
+                for item in yaml_data:
+                    if isinstance(item, dict):
+                        # Each item is a dict where the key is the module name
+                        # and the value contains the module configuration
+                        for module_name, module_config in item.items():
+                            if isinstance(module_config, dict):
+                                # Look for version field in module config
+                                module_version = "unknown"
+                                if 'version' in module_config:
+                                    module_version = str(module_config['version'])
+                                elif 'ver' in module_config:
+                                    module_version = str(module_config['ver'])
+                                
+                                modules.append(ModuleInfo(
+                                    name=str(module_name),
+                                    version=module_version
+                                ))
+                            
+        except (IOError, UnicodeDecodeError, yaml.YAMLError) as e:
+            # If YAML parsing fails, silently continue
+            pass
+            
+        return modules
 
 
 class SingleTestRunner:
@@ -215,6 +281,7 @@ class SingleTestRunner:
                 expected_pass=config.pass_expected,
                 runtime=0.0,
                 timeout_limit=config.timeout,
+                modules=config.modules,
                 error_msg=f"Environment script not found: {env_script}"
             )
         
@@ -225,6 +292,7 @@ class SingleTestRunner:
                 expected_pass=config.pass_expected,
                 runtime=0.0,
                 timeout_limit=config.timeout,
+                modules=config.modules,
                 error_msg=f"GRun script not found: {grun_script}"
             )
         
@@ -250,6 +318,7 @@ class SingleTestRunner:
                 expected_pass=config.pass_expected,
                 runtime=runtime,
                 timeout_limit=config.timeout,
+                modules=config.modules,
                 stdout=result.stdout,
                 stderr=result.stderr
             )
@@ -262,6 +331,7 @@ class SingleTestRunner:
                 expected_pass=config.pass_expected,
                 runtime=runtime,
                 timeout_limit=config.timeout,
+                modules=config.modules,
                 stdout=e.stdout.decode('utf-8') if e.stdout else "",
                 stderr=e.stderr.decode('utf-8') if e.stderr else "",
                 error_msg=f"Test timed out after {config.timeout} seconds"
@@ -275,6 +345,7 @@ class SingleTestRunner:
                 expected_pass=config.pass_expected,
                 runtime=runtime,
                 timeout_limit=config.timeout,
+                modules=config.modules,
                 error_msg=str(e)
             )
 
@@ -323,6 +394,8 @@ class TestRunner:
                 expected_text = "PASS" if result.expected_pass else "FAIL"
                 actual_text = result.status.value
                 print(f"{result.status_symbol} Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
+                # Show module information
+                self.output_formatter._print_test_modules(result)
                 # Show error logs in non-verbose mode too
                 self.output_formatter.print_error_logs(result)
             elif verbose:
@@ -384,6 +457,10 @@ class TestOutputFormatter:
         expected_text = "PASS" if result.expected_pass else "FAIL"
         actual_text = result.status.value
         print(f"  Result: {result.status_symbol} Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
+        
+        # Show module information
+        self._print_test_modules(result)
+        
         if result.error_msg:
             print(f"  Error: {result.error_msg}")
         
@@ -405,6 +482,15 @@ class TestOutputFormatter:
                 print(f"    {line}")
         
         print()
+    
+    def _print_test_modules(self, result: TestResult) -> None:
+        """Print module information for a single test."""
+        if result.modules:
+            modules_info = []
+            for module in result.modules:
+                modules_info.append(f"{module.name}:{module.version}")
+            modules_str = ", ".join(modules_info)
+            print(f"  📦 Modules: {modules_str}")
     
     def print_test_summary(self, results: List[TestResult], verbose: bool = False) -> None:
         """Print summary of all test results."""
@@ -458,7 +544,15 @@ class TestOutputFormatter:
                 expected_text = "PASS" if result.expected_pass else "FAIL"
                 actual_text = result.status.value
                 status_text = "SUCCESS" if result.success else "FAILED"
-                print(f"  {result.status_symbol} {result.job_file}: {status_text} - Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s)")
+                
+                # Build modules info string
+                modules_info = ""
+                if result.modules:
+                    modules_list = [f"{m.name}:{m.version}" for m in result.modules]
+                    modules_str = ", ".join(modules_list)
+                    modules_info = f" [📦 {modules_str}]"
+                
+                print(f"  {result.status_symbol} {result.job_file}: {status_text} - Expected: {expected_text}, Actual: {actual_text} ({result.runtime:.1f}s){modules_info}")
 
 def validate_geodelity_dir(geodelity_dir: str) -> bool:
     """Backward compatibility function for validating GEODELITY_DIR."""

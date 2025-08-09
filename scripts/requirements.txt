@@ -1,0 +1,10 @@
+# Requirements for modules/scripts Python tools
+# These dependencies are needed for the build and test management scripts
+
+# YAML parsing for job file configuration
+PyYAML==6.0.2
+
+# Optional: Enhanced CLI output (if using rich/typer features in future)
+# rich==14.0.0
+# typer==0.16.0
+# click==8.2.1
