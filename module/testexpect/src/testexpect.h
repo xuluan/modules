@@ -5,10 +5,21 @@
 #include <string>
 #include "ArrowStore.h"
 
+#define DEBUG_DUMP 0
+
+#if DEBUG_DUMP
+void pdump(char* p, size_t len);
+#endif
+
 enum class CheckPattern {
-    SAME,  //no change, default
-    ATTR_PLUS_MUL //  INLINE+CROSSLINE*2.7
+    SKIP,  //dont check, default: skip
+    SAME,  //no change : same
+    ATTRCALC_PLUS_MUL //  : ATTRCALC_INLINE+CROSSLINE*2.7
 };
+
+std::string to_string(CheckPattern c);
+CheckPattern to_checkpattern(std::string s);
+
 
 struct AttrConfig {
     std::string name;
@@ -53,6 +64,11 @@ struct Testexpect {
     std::vector<AttrConfig> attrs;
     void* logger;
 };
+
+std::string to_string(CheckPattern c);
+CheckPattern to_checkpattern(std::string s);
+void* get_and_check_data_valid(Testexpect* my_data, std::string  attr_name, int length, as::DataFormat format, std::map<std::string, AttrData>& variables);
+bool is_equal_float_double(float a, double b);
 
 #ifdef __cplusplus
     extern "C" {

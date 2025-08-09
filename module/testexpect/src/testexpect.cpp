@@ -12,7 +12,10 @@
 #include <fstream>
 #include <stdexcept>
 
-#define DEBUG_DUMP 0
+#include "common_expect.h"
+#include "attrcalc_expect.h"
+
+
 
 #if DEBUG_DUMP
 void pdump(char* p, size_t len) {
@@ -39,7 +42,8 @@ void pdump(char* p, size_t len) {
 std::string to_string(CheckPattern c) {
     switch(c) {
         case CheckPattern::SAME:    return "SAME";
-        case CheckPattern::ATTR_PLUS_MUL:  return "INLINE+CROSSLINE*2.7";
+        case CheckPattern::SKIP:    return "SKIP";
+        case CheckPattern::ATTRCALC_PLUS_MUL:  return "ATTRCALC_INLINE+CROSSLINE*2.7";
         default:  throw std::runtime_error("Error CheckPattern");
     }
 }
@@ -47,8 +51,10 @@ std::string to_string(CheckPattern c) {
 CheckPattern to_checkpattern(std::string s) {
     if(s == "SAME") {
         return CheckPattern::SAME;
-    } else if(s == "INLINE+CROSSLINE*2.7") {
-        return CheckPattern::ATTR_PLUS_MUL;
+    } else if(s == "SKIP") {
+        return CheckPattern::SKIP;
+    } else if(s == "ATTRCALC_INLINE+CROSSLINE*2.7") {
+        return CheckPattern::ATTRCALC_PLUS_MUL;
     } else {
         throw std::runtime_error("Unknown CheckPattern  : " + s);
     }
@@ -107,37 +113,6 @@ void* get_and_check_data_valid(Testexpect* my_data, std::string  attr_name, int 
     }
 }
 
-bool check_data_same(Testexpect* my_data, std::string&  attr_name, AttrData& attr_data, std::map<std::string, AttrData>& variables)
-{
-    auto& gd_logger = gdlog::GdLogger::GetInstance();
-    int group_size = my_data->group_size;
-
-    void* dst = attr_data.data;
-
-    void* src = get_and_check_data_valid(my_data, attr_name, attr_data.length, attr_data.type, variables);      
-#if DEBUG_DUMP
-    printf("check_data_same, dump attr %s \n src:\n", attr_name.c_str());
-
-    pdump(static_cast<char*>(src), attr_data.length * as::get_data_format_size(attr_data.type));
-    printf("dst:\n");
-    pdump(static_cast<char*>(dst), attr_data.length * as::get_data_format_size(attr_data.type));
-
-#endif
-    if( !dst) {
-        throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
-    }
-
-    gd_logger.LogDebug(my_data->logger, "Dst Attr: {}, Length: {}, Type: {}", attr_name, attr_data.length, as::data_format_to_string(attr_data.type));
-
-    if(std::memcmp(src, dst, attr_data.length * as::get_data_format_size(attr_data.type)) != 0) {
-
-        return false;
-    } else {
-        return true;
-    }
-}
-
-
 bool is_equal_float_double(float a, double b) {
     const float epsilon = std::numeric_limits<float>::epsilon() * 100;
     
@@ -146,43 +121,14 @@ bool is_equal_float_double(float a, double b) {
     return diff < epsilon;
 }
 
-
-bool check_data_plus_mul(Testexpect* my_data, std::string&  attr_name, AttrData& attr_data, std::map<std::string, AttrData>& variables)
-{
-    //check "INLINE+CROSSLINE*2.7"
-    int length =  attr_data.length;
-
-    int * pinline = static_cast<int *>(get_and_check_data_valid(my_data, "INLINE", attr_data.length, as::DataFormat::FORMAT_U32, variables));
-    int * pcrossline = static_cast<int *>(get_and_check_data_valid(my_data, "CROSSLINE", attr_data.length, as::DataFormat::FORMAT_U32, variables));
-
-    float* dst = static_cast<float *> (attr_data.data);     
-
-    if( !dst) {
-        throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
-    }
-#if DEBUG_DUMP        
-    printf("check_data_plus_mul, dump attr %s \n", attr_name.c_str());
-#endif    
-    for(int i = 0; i < length; ++i) {
-        double c = 2.7;
-        double d = c * pcrossline[i] + pinline[i];
-#if DEBUG_DUMP        
-        printf(" %d, %d, %d, %f == %f \n", i, pinline[i], pcrossline[i], d, dst[i]);
-#endif        
-        if(!is_equal_float_double(dst[i], d)) {
-            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + "expect " + std::to_string(dst[i]) + " but got " + std::to_string(d));
-        } 
-    }
-
-    return true;
-}
-
 bool check_data(Testexpect* my_data, std::string  attr_name, AttrData& attr_data, std::map<std::string, AttrData>& variables, CheckPattern c)
 {
     switch(c) {
         case CheckPattern::SAME:    
             return check_data_same(my_data, attr_name, attr_data, variables);
-        case CheckPattern::ATTR_PLUS_MUL:  
+        case CheckPattern::SKIP:    
+            return check_data_skip(my_data, attr_name, attr_data, variables);            
+        case CheckPattern::ATTRCALC_PLUS_MUL:  
             return check_data_plus_mul(my_data, attr_name, attr_data, variables);
         default:  
             throw std::runtime_error("check_data fail: Error CheckPattern");
@@ -483,7 +429,7 @@ void testexpect_process(const char* myid)
         
         // load data
         for(int i = 0; i < my_data->attrs.size(); ++i) {
-            if(my_data->attrs[i].check_pattern == CheckPattern::ATTR_PLUS_MUL)
+            if(my_data->attrs[i].check_pattern == CheckPattern::ATTRCALC_PLUS_MUL)
                 continue;
             load_data(my_data->attrs[i].data, my_data->attrs[i].name + ".DAT", grp_size * my_data->attrs[i].length * as::get_data_format_size(my_data->attrs[i].type));
             data = static_cast<void*>(my_data->attrs[i].data.data());

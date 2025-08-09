@@ -4,6 +4,8 @@ project(testexpect)
 
 add_library(testexpect STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/testexpect.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/common_expect.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/attrcalc_expect.cpp
 )
 
 target_compile_features(testexpect PRIVATE cxx_std_17)
