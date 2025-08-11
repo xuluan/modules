@@ -1,4 +1,4 @@
-"name": "input",
+"name": "segyinput",
 "version": "1.0.0",
 "use_mpi": false,
 "use_cuda": false,
@@ -7,7 +7,7 @@
   "required": true,
   "format": "text",
   "default": "",
-  "help": "The full path of the input dataset, ie, /full/path/to/the/input_data.vds",
+  "help": "The full path of the segyinput dataset, ie, /full/path/to/the/segyinput_data.vds",
   "width": "full",
   "button": "file",
   "filefilter": "*.vds"

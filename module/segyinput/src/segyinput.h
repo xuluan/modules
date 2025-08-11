@@ -1,12 +1,12 @@
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef SEGYINPUT_H
+#define SEGYINPUT_H
 
 #include <vector>
 #include <memory>
 #include <GdLogger.h>
 #include <VdsStore.h>
 
-struct Input {
+struct Segyinput {
   int pkey_dim;                 // the dimension of the pkey in VDS
   int current_pkey_index;
   std::vector<int> pkeys;
@@ -20,11 +20,11 @@ struct Input {
 extern "C" {
 #endif
 
-void input_init(const char* myid, const char* mod_cfg);
-void input_process(const char* myid);
+void segyinput_init(const char* myid, const char* mod_cfg);
+void segyinput_process(const char* myid);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ifndef INPUT_H */
+#endif /* ifndef SEGYINPUT_H */

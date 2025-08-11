@@ -1,42 +1,42 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(input)
+project(segyinput)
 
-add_library(input STATIC
-  ${CMAKE_CURRENT_LIST_DIR}/src/input.cpp
+add_library(segyinput STATIC
+  ${CMAKE_CURRENT_LIST_DIR}/src/segyinput.cpp
 )
 
-target_compile_features(input PRIVATE cxx_std_17)
+target_compile_features(segyinput PRIVATE cxx_std_17)
 
 list(APPEND CMAKE_MODULE_PATH $ENV{MODULECONFIG_DIR}/cmake)
 include(moduleconfig_libs)
-target_link_libraries(input PRIVATE
+target_link_libraries(segyinput PRIVATE
             moduleconfig_libs)
 list(APPEND CMAKE_MODULE_PATH $ENV{GEODATAFLOW_DIR}/cmake)
 include(geodataflow_libs)
-target_link_libraries(input PRIVATE
+target_link_libraries(segyinput PRIVATE
             geodataflow_libs)
 
 list(APPEND CMAKE_MODULE_PATH $ENV{VDSSTORE_DIR}/cmake)
 include(vdsstore_libs)
-target_link_libraries(input PRIVATE
+target_link_libraries(segyinput PRIVATE
             vdsstore_libs)
 include(openvds_libs)
-target_link_libraries(input PRIVATE
+target_link_libraries(segyinput PRIVATE
             openvds_libs)
 
 list(APPEND CMAKE_MODULE_PATH $ENV{libfort_ROOT}/cmake)
 find_package(libfort REQUIRED)
-target_link_libraries(input PRIVATE
+target_link_libraries(segyinput PRIVATE
             libfort::fort)
 
 list(APPEND CMAKE_MODULE_PATH $ENV{GDLOGGER_DIR}/cmake)
 include(gdlogger_libs)
-target_link_libraries(input PRIVATE
+target_link_libraries(segyinput PRIVATE
             gdlogger_libs)
 
 install(TARGETS
-  input
+  segyinput
   RUNTIME
     COMPONENT Runtime
   LIBRARY
@@ -48,6 +48,6 @@ install(TARGETS
 )
 
 install(FILES
-  src/input.json
+  src/segyinput.json
   DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

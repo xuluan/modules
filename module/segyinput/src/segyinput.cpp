@@ -1,4 +1,4 @@
-#include "input.h"
+#include "segyinput.h"
 #include "ArrowStore.h"
 #include "GeoDataFlow.h"
 #include <ModuleConfig.h>
@@ -8,16 +8,16 @@
 #include <filesystem>
 #include "fort.hpp"
 
-void input_init(const char* myid, const char* buf)
+void segyinput_init(const char* myid, const char* buf)
 {
-  std::string logger_name = std::string {"input_"} + myid;
+  std::string logger_name = std::string {"segyinput_"} + myid;
   auto& gd_logger = gdlog::GdLogger::GetInstance();
   void* my_logger = gd_logger.Init(logger_name);
-  gd_logger.LogInfo(my_logger, "input_init");
+  gd_logger.LogInfo(my_logger, "segyinput_init");
 
   // Need to pass the pointer to DF after init function returns
   // So we use raw pointer instead of a smart pointer here
-  Input* my_data = new Input {};
+  Segyinput* my_data = new Segyinput {};
 
   my_data->logger = my_logger;
 
@@ -32,23 +32,23 @@ void input_init(const char* myid, const char* buf)
 
   // parse job parameters
   mc::ModuleConfig mod_conf = mc::ModuleConfig {};  mod_conf.Parse(buf);
-  mod_conf.GetText("input.url", my_data->data_url);
+  mod_conf.GetText("segyinput.url", my_data->data_url);
   if(mod_conf.HasError()) {
-    gd_logger.LogError(my_logger, "Failed to get input data url. Error: {}", mod_conf.ErrorMessage().c_str());
+    gd_logger.LogError(my_logger, "Failed to get segyinput data url. Error: {}", mod_conf.ErrorMessage().c_str());
     job_df.SetJobAborted();
     _clean_up();
     return;
   }
 
   if (my_data->data_url.empty()) {
-    gd_logger.LogError(my_logger, "The input data url should not be empty");
+    gd_logger.LogError(my_logger, "The segyinput data url should not be empty");
     job_df.SetJobAborted();
     _clean_up();
     return;
   }
 
   if (!std::filesystem::exists(my_data->data_url)) {
-    gd_logger.LogError(my_logger, "The input data file {} does not exist", my_data->data_url);
+    gd_logger.LogError(my_logger, "The segyinput data file {} does not exist", my_data->data_url);
     job_df.SetJobAborted();
     _clean_up();
     return;
@@ -57,7 +57,7 @@ void input_init(const char* myid, const char* buf)
   // read input dataset
   ovds::VdsStore* pvs = new ovds::VdsStore(my_data->data_url);
   if (pvs->HasError()) {
-    gd_logger.LogError(my_logger, "Failed to open the input dataset {}. Error: {}", 
+    gd_logger.LogError(my_logger, "Failed to open the segyinput dataset {}. Error: {}", 
                        my_data->data_url, pvs->ErrorMessage());
     job_df.SetJobAborted();
     _clean_up();
@@ -65,7 +65,7 @@ void input_init(const char* myid, const char* buf)
   }
   pvs->ReadAxesInfo();
   if (pvs->HasError()) {
-    gd_logger.LogError(my_logger, "Failed to read dimension information of the input dataset. Error: {}", 
+    gd_logger.LogError(my_logger, "Failed to read dimension information of the segyinput dataset. Error: {}", 
                        pvs->ErrorMessage());
     job_df.SetJobAborted();
     _clean_up();
@@ -83,7 +83,7 @@ void input_init(const char* myid, const char* buf)
 
   // set up key dimensions
   std::string slice_pos;
-  mod_conf.GetText("input.sliceposition", slice_pos);
+  mod_conf.GetText("segyinput.sliceposition", slice_pos);
   if(mod_conf.HasError()) {
     gd_logger.LogError(my_logger, "Failed to get sliceposition. Error: {}", mod_conf.ErrorMessage().c_str());
     gd_logger.LogWarning(my_logger, "In this case, get slices on the primary key");
@@ -269,12 +269,12 @@ void input_init(const char* myid, const char* buf)
   std::cout << std::endl;
 }
 
-void input_process(const char* myid)
+void segyinput_process(const char* myid)
 {
   auto& gd_logger = gdlog::GdLogger::GetInstance();
   auto& job_df = df::GeoDataFlow::GetInstance();
 
-  Input* my_data = static_cast<Input*>(job_df.GetModuleStruct(myid));
+  Segyinput* my_data = static_cast<Segyinput*>(job_df.GetModuleStruct(myid));
   void* my_logger = my_data->logger;
 
   // A handy function to clean up resources if errors happen, 
