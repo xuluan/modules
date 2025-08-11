@@ -4,6 +4,8 @@ project(segyinput)
 
 add_library(segyinput STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/segyinput.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/segy_reader.cpp
+
 )
 
 target_compile_features(segyinput PRIVATE cxx_std_17)
