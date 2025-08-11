@@ -1,44 +1,31 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(segyinput)
+project(segytest)
 
-add_library(segyinput STATIC
-  ${CMAKE_CURRENT_LIST_DIR}/src/segyinput.cpp
+# Build the static library (simplified version without OpenVDS dependencies)
+add_library(segytest STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/segy_reader.cpp
-
 )
 
-target_compile_features(segyinput PRIVATE cxx_std_17)
+# Build the executable
+add_executable(segytest_main
+  ${CMAKE_CURRENT_LIST_DIR}/main.cpp
+)
 
-list(APPEND CMAKE_MODULE_PATH $ENV{MODULECONFIG_DIR}/cmake)
-include(moduleconfig_libs)
-target_link_libraries(segyinput PRIVATE
-            moduleconfig_libs)
-list(APPEND CMAKE_MODULE_PATH $ENV{GEODATAFLOW_DIR}/cmake)
-include(geodataflow_libs)
-target_link_libraries(segyinput PRIVATE
-            geodataflow_libs)
+# Set C++17 for both targets
+target_compile_features(segytest PRIVATE cxx_std_17)
+target_compile_features(segytest_main PRIVATE cxx_std_17)
 
-list(APPEND CMAKE_MODULE_PATH $ENV{VDSSTORE_DIR}/cmake)
-include(vdsstore_libs)
-target_link_libraries(segyinput PRIVATE
-            vdsstore_libs)
-include(openvds_libs)
-target_link_libraries(segyinput PRIVATE
-            openvds_libs)
+# Link the executable with the library and basic system libraries
+target_link_libraries(segytest_main PRIVATE segytest)
 
-list(APPEND CMAKE_MODULE_PATH $ENV{libfort_ROOT}/cmake)
-find_package(libfort REQUIRED)
-target_link_libraries(segyinput PRIVATE
-            libfort::fort)
-
-list(APPEND CMAKE_MODULE_PATH $ENV{GDLOGGER_DIR}/cmake)
-include(gdlogger_libs)
-target_link_libraries(segyinput PRIVATE
-            gdlogger_libs)
+# Add pthread if needed
+find_package(Threads REQUIRED)
+target_link_libraries(segytest_main PRIVATE Threads::Threads)
 
 install(TARGETS
-  segyinput
+  segytest
+  segytest_main
   RUNTIME
     COMPONENT Runtime
   LIBRARY
@@ -47,9 +34,4 @@ install(TARGETS
   ARCHIVE
     COMPONENT Development
     DESTINATION ${CMAKE_INSTALL_PREFIX}
-)
-
-install(FILES
-  src/segyinput.json
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

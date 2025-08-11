@@ -13,10 +13,24 @@
 #include <cstdint>
 #include <functional>
 
-// OpenVDS SEGY utilities headers
-#include "SEGYUtils/SEGY.h"
+// Note: Using simplified approach without OpenVDS dependencies
 
-// Note: Using simplified approach without complex OpenVDS internal dependencies
+// Simple SEGY enums for this demonstration
+namespace SEGY {
+    namespace BinaryHeader {
+        enum class DataSampleFormatCode {
+            Unknown = 0,
+            IEEEFloat = 5,
+            Int32 = 2,
+            Int16 = 3
+        };
+    }
+    
+    enum class Endianness {
+        BigEndian = 0,
+        LittleEndian = 1
+    };
+}
 
 struct SEGYVolumeInfo {
     // Volume dimensions

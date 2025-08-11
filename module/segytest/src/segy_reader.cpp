@@ -12,9 +12,6 @@
 #include <limits.h>
 #include <cstdint>
 #include <arpa/inet.h>  // For ntohl, ntohs (network byte order conversion)
-
-// OpenVDS library includes
-#include <OpenVDS/OpenVDS.h>
 #include <memory>
 #include <climits>
 
@@ -103,7 +100,7 @@ bool SEGYReader::setupDataProvider() {
 bool SEGYReader::scanSEGYFile() {
     try {
         std::cout << "Scanning SEGY file structure..." << std::endl;
-/*
+/*      todo : extract meta data
         // Extract comprehensive metadata
         std::cout << "Extracting SEGY metadata..." << std::endl;
         if (!SEGYMetadataExtractor::extractMetadata(m_segyFilePath, m_metadata)) {
