@@ -36,7 +36,6 @@ bool check_data_plus_mul(Testexpect* my_data, std::string&  attr_name, AttrData&
 //  SIN((INLINE + CROSSLINE) * 0.1) + COS(INLINE * 0.2) * sin(tan(CROSSLINE))
 bool check_data_complex_1(Testexpect* my_data, std::string&  attr_name, AttrData& attr_data, std::map<std::string, AttrData>& variables)
 {
-    //check "INLINE+CROSSLINE*2.7"
     int length =  attr_data.length;
 
     int * pinline = static_cast<int *>(get_and_check_data_valid(my_data, "INLINE", attr_data.length, as::DataFormat::FORMAT_U32, variables));
