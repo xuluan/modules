@@ -105,6 +105,15 @@ private:
     bool extractRealCoordinateBounds();
     int64_t getTraceNumberFromCoordinates(int inlineNum, int crosslineNum);
     
+    // Endian conversion utilities
+    static uint16_t swapEndian16(uint16_t value);
+    static uint32_t swapEndian32(uint32_t value);
+    static int16_t readInt16BE(const void* data);
+    static int32_t readInt32BE(const void* data);
+    static uint16_t readUInt16BE(const void* data);
+    static uint32_t readUInt32BE(const void* data);
+    static float readFloatBE(const void* data);
+    
     // Member variables
     std::string m_segyFilePath;
     

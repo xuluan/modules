@@ -25,6 +25,47 @@ SEGYReader::SEGYReader()
 {
 }
 
+// Endian conversion utilities
+uint16_t SEGYReader::swapEndian16(uint16_t value) {
+    return ((value & 0xFF) << 8) | ((value >> 8) & 0xFF);
+}
+
+uint32_t SEGYReader::swapEndian32(uint32_t value) {
+    return ((value & 0xFF) << 24) | (((value >> 8) & 0xFF) << 16) | 
+           (((value >> 16) & 0xFF) << 8) | ((value >> 24) & 0xFF);
+}
+
+int16_t SEGYReader::readInt16BE(const void* data) {
+    uint16_t value;
+    std::memcpy(&value, data, sizeof(uint16_t));
+    return static_cast<int16_t>(swapEndian16(value));
+}
+
+int32_t SEGYReader::readInt32BE(const void* data) {
+    uint32_t value;
+    std::memcpy(&value, data, sizeof(uint32_t));
+    return static_cast<int32_t>(swapEndian32(value));
+}
+
+uint16_t SEGYReader::readUInt16BE(const void* data) {
+    uint16_t value;
+    std::memcpy(&value, data, sizeof(uint16_t));
+    return swapEndian16(value);
+}
+
+uint32_t SEGYReader::readUInt32BE(const void* data) {
+    uint32_t value;
+    std::memcpy(&value, data, sizeof(uint32_t));
+    return swapEndian32(value);
+}
+
+float SEGYReader::readFloatBE(const void* data) {
+    uint32_t intValue = readUInt32BE(data);
+    float floatValue;
+    std::memcpy(&floatValue, &intValue, sizeof(float));
+    return floatValue;
+}
+
 SEGYReader::~SEGYReader() = default;
 
 bool SEGYReader::initialize(const std::string& segyFilePath) {
@@ -128,17 +169,10 @@ bool SEGYReader::scanSEGYFile() {
         file.read(binaryHeader, 400);
         
         // Extract samples per trace (bytes 3220-3221, 0-based in binary header is 20-21)
-        uint16_t samplesPerTrace = 0;
-        file.seekg(3220);
-        file.read(reinterpret_cast<char*>(&samplesPerTrace), 2);
-        // Convert from big-endian if needed
-        samplesPerTrace = ((samplesPerTrace & 0xFF) << 8) | ((samplesPerTrace >> 8) & 0xFF);
+        uint16_t samplesPerTrace = readUInt16BE(&binaryHeader[20]);
         
-        // Extract sample interval (bytes 3216-3217)
-        uint16_t sampleIntervalMicros = 0;
-        file.seekg(3216);
-        file.read(reinterpret_cast<char*>(&sampleIntervalMicros), 2);
-        sampleIntervalMicros = ((sampleIntervalMicros & 0xFF) << 8) | ((sampleIntervalMicros >> 8) & 0xFF);
+        // Extract sample interval (bytes 3216-3217, 0-based in binary header is 16-17)
+        uint16_t sampleIntervalMicros = readUInt16BE(&binaryHeader[16]);
         
         // Scan traces to find actual inline/crossline ranges
         file.seekg(3600); // Start of trace data
@@ -156,16 +190,10 @@ bool SEGYReader::scanSEGYFile() {
             if (!file.read(traceHeader, 240)) break;
             
             // Extract inline number (bytes 188-191 in trace header, big-endian int32)
-            int32_t inlineNum = 0;
-            memcpy(&inlineNum, &traceHeader[188], 4);
-            inlineNum = ((inlineNum & 0xFF) << 24) | (((inlineNum >> 8) & 0xFF) << 16) | 
-                       (((inlineNum >> 16) & 0xFF) << 8) | ((inlineNum >> 24) & 0xFF);
+            int32_t inlineNum = readInt32BE(&traceHeader[188]);
             
             // Extract crossline number (bytes 192-195 in trace header, big-endian int32)
-            int32_t crosslineNum = 0;
-            memcpy(&crosslineNum, &traceHeader[192], 4);
-            crosslineNum = ((crosslineNum & 0xFF) << 24) | (((crosslineNum >> 8) & 0xFF) << 16) | 
-                          (((crosslineNum >> 16) & 0xFF) << 8) | ((crosslineNum >> 24) & 0xFF);
+            int32_t crosslineNum = readInt32BE(&traceHeader[192]);
             
             // Update ranges if valid coordinates found
             if (inlineNum > 0 && crosslineNum > 0) {
@@ -343,15 +371,8 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
         }
         
         // Verify inline/crossline numbers from trace header  
-        int32_t fileInline, fileCrossline;
-        std::memcpy(&fileInline, &traceHeader[188], 4);   // Bytes 188-191: Inline
-        std::memcpy(&fileCrossline, &traceHeader[192], 4); // Bytes 192-195: Crossline
-        
-        // Convert from big-endian if needed
-        if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
-            fileInline = ntohl(fileInline);
-            fileCrossline = ntohl(fileCrossline);
-        }
+        int32_t fileInline = readInt32BE(&traceHeader[188]);   // Bytes 188-191: Inline
+        int32_t fileCrossline = readInt32BE(&traceHeader[192]); // Bytes 192-195: Crossline
         
         // For files without proper inline/crossline, skip verification
         if (fileInline > 0 && fileCrossline > 0) {
@@ -368,13 +389,8 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
                     file.seekg(searchOffset);
                     
                     if (file.read(traceHeader, 240) && file.gcount() == 240) {
-                        std::memcpy(&fileInline, &traceHeader[188], 4);
-                        std::memcpy(&fileCrossline, &traceHeader[192], 4);
-                        
-                        if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
-                            fileInline = ntohl(fileInline);
-                            fileCrossline = ntohl(fileCrossline);
-                        }
+                        fileInline = readInt32BE(&traceHeader[188]);
+                        fileCrossline = readInt32BE(&traceHeader[192]);
                         
                         if (fileInline == inline_num && fileCrossline == crossline_num) {
                             found = true;
@@ -406,58 +422,31 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
         switch (m_volumeInfo.dataFormat) {
             case SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat: {
                 // IEEE 32-bit floating point
-                const float* floatData = reinterpret_cast<const float*>(rawSampleData.data());
                 for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
-                    float value = floatData[i];
-                    // Handle endianness conversion if needed
-                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
-                        uint32_t temp;
-                        std::memcpy(&temp, &value, 4);
-                        temp = ntohl(temp);
-                        std::memcpy(&value, &temp, 4);
-                    }
-                    traceData[i] = value;
+                    traceData[i] = readFloatBE(&rawSampleData[i * 4]);
                 }
                 break;
             }
             case SEGY::BinaryHeader::DataSampleFormatCode::Int32: {
                 // 32-bit integer
-                const int32_t* intData = reinterpret_cast<const int32_t*>(rawSampleData.data());
                 for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
-                    int32_t value = intData[i];
-                    // Handle endianness conversion if needed
-                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
-                        value = ntohl(value);
-                    }
+                    int32_t value = readInt32BE(&rawSampleData[i * 4]);
                     traceData[i] = static_cast<float>(value);
                 }
                 break;
             }
             case SEGY::BinaryHeader::DataSampleFormatCode::Int16: {
                 // 16-bit integer
-                const int16_t* shortData = reinterpret_cast<const int16_t*>(rawSampleData.data());
                 for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
-                    int16_t value = shortData[i];
-                    // Handle endianness conversion if needed
-                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
-                        value = ntohs(value);
-                    }
+                    int16_t value = readInt16BE(&rawSampleData[i * 2]);
                     traceData[i] = static_cast<float>(value);
                 }
                 break;
             }
             default:
                 // Fallback to IEEE Float format
-                const float* floatData = reinterpret_cast<const float*>(rawSampleData.data());
                 for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
-                    float value = floatData[i];
-                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
-                        uint32_t temp;
-                        std::memcpy(&temp, &value, 4);
-                        temp = ntohl(temp);
-                        std::memcpy(&value, &temp, 4);
-                    }
-                    traceData[i] = value;
+                    traceData[i] = readFloatBE(&rawSampleData[i * 4]);
                 }
                 break;
         }
@@ -548,11 +537,7 @@ bool SEGYReader::extractRealCoordinateBounds() {
         }
         
         // Extract sample count from binary header (bytes 3220-3221, 0-based offset 20-21)
-        int16_t samplesPerTrace = 0;
-        std::memcpy(&samplesPerTrace, &binaryHeader[20], 2);
-        
-        // Handle endianness (SEGY is typically big endian)
-        samplesPerTrace = ntohs(samplesPerTrace);
+        int16_t samplesPerTrace = readInt16BE(&binaryHeader[20]);
         
         if (samplesPerTrace <= 0 || samplesPerTrace > 32000) {
             std::cout << "Warning: Invalid samples per trace: " << samplesPerTrace << std::endl;
@@ -591,17 +576,9 @@ bool SEGYReader::extractRealCoordinateBounds() {
             // Bytes 184-187: CDP Y coordinate (EnsembleYCoordinateHeaderField)  
             // Bytes 70-71:   Coordinate scale factor (CoordinateScaleHeaderField)
             
-            int32_t xCoord, yCoord;
-            int16_t coordinateScale;
-            
-            std::memcpy(&xCoord, &traceHeader[180], 4);
-            std::memcpy(&yCoord, &traceHeader[184], 4);
-            std::memcpy(&coordinateScale, &traceHeader[70], 2);
-            
-            // Convert from network byte order (big endian)
-            xCoord = ntohl(xCoord);
-            yCoord = ntohl(yCoord);
-            coordinateScale = ntohs(coordinateScale);
+            int32_t xCoord = readInt32BE(&traceHeader[180]);
+            int32_t yCoord = readInt32BE(&traceHeader[184]);
+            int16_t coordinateScale = readInt16BE(&traceHeader[70]);
             
             // Check if coordinates are valid (non-zero)
             if (xCoord != 0 || yCoord != 0) {
