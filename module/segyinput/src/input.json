@@ -1,0 +1,26 @@
+"name": "input",
+"version": "1.0.0",
+"use_mpi": false,
+"use_cuda": false,
+"url": {
+  "type": "argument",
+  "required": true,
+  "format": "text",
+  "default": "",
+  "help": "The full path of the input dataset, ie, /full/path/to/the/input_data.vds",
+  "width": "full",
+  "button": "file",
+  "filefilter": "*.vds"
+},
+"sliceposition":{
+  "type": "argument",
+  "required": false,
+  "help": "Indicate on which axis to read the slice. By default, get slices on primary key. Possible values are 'on_primary_key', 'on_secondary_key', and 'on_data_samples'",
+  "format": "text",
+  "default": "on_primary_key",
+  "options": [
+    "on_primary_key",
+    "on_secondary_key",
+    "on_data_samples"
+  ]
+}
