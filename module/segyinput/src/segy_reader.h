@@ -13,13 +13,10 @@
 #include <cstdint>
 #include <functional>
 
-// OpenVDS SEGY utilities headers - forward declarations to avoid internal dependencies
+// OpenVDS SEGY utilities headers
 #include "SEGYUtils/SEGY.h"
 
-// Forward declarations to avoid including internal headers
-class DataProvider;
-class TraceDataManager;
-struct SEGYFileInfo;
+// Note: Using simplified approach without complex OpenVDS internal dependencies
 
 struct SEGYVolumeInfo {
     // Volume dimensions
@@ -64,6 +61,15 @@ public:
     // Get volume information after initialization
     const SEGYVolumeInfo& getVolumeInfo() const { return m_volumeInfo; }
 
+/*
+    // Get extracted metadata
+    const SEGYMetadata& getMetadata() const { return m_metadata; }
+    
+    // Get format compatibility information
+    const SEGYFormatInfo& getFormatInfo() const { return m_formatInfo; }
+*/    
+
+    
     // Read trace data for a specific inline/crossline
     bool readTrace(int inline_num, int crossline_num, std::vector<float>& traceData);
     
@@ -71,7 +77,6 @@ public:
     bool readTraceRegion(int inlineStart, int inlineEnd, 
                         int crosslineStart, int crosslineEnd,
                         std::vector<float>& volumeData);
-
     
     // Error handling
     const std::string& getLastError() const { return m_lastError; }
@@ -82,18 +87,31 @@ private:
     bool validateSEGYFile();
     void calculateVolumeInfo();
     bool setupDataProvider();
+    bool setupTraceManagement();
+    bool extractRealCoordinateBounds();
+    int64_t getTraceNumberFromCoordinates(int inlineNum, int crosslineNum);
     
     // Member variables
     std::string m_segyFilePath;
-    // Note: Using simplified implementation for demonstration
-    // In production, you would use the OpenVDS SEGY import libraries directly
     
     SEGYVolumeInfo m_volumeInfo;
     std::string m_lastError;
+/*
+    SEGYMetadata m_metadata;
+    SEGYFormatInfo m_formatInfo;
+*/
+
     
     // Internal state
     bool m_initialized;
     std::vector<std::string> m_inputFiles;
+    
+    // Note: Using direct file I/O approach since OpenVDS binary distribution
+    // doesn't include complete SEGYUtils headers
+    
+    // Additional members for trace management
+    int64_t m_traceByteSize;
+    int64_t m_tracesPerPage;
 };
 
 #endif // SEGY_READER_H

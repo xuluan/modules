@@ -12,12 +12,19 @@
 #include <limits.h>
 #include <cstdint>
 #include <arpa/inet.h>  // For ntohl, ntohs (network byte order conversion)
-// Note: Using forward declarations to avoid complex OpenVDS internal dependencies
-// #include "SEGYUtils/SEGYFileInfo.h" 
-// #include "SEGYUtils/DataProvider.h"
+
+// OpenVDS library includes
+#include <OpenVDS/OpenVDS.h>
+#include <memory>
+#include <climits>
+
+// Note: Using simplified approach due to binary distribution limitations
+// Full SEGYUtils integration would require building from source
 
 SEGYReader::SEGYReader()
     : m_initialized(false)
+    , m_traceByteSize(0)
+    , m_tracesPerPage(1000)
 {
 }
 
@@ -55,6 +62,12 @@ bool SEGYReader::initialize(const std::string& segyFilePath) {
         // Calculate volume information
         calculateVolumeInfo();
         
+        // Setup DataViewManager and TraceDataManager
+        if (!setupTraceManagement()) {
+            m_lastError = "Failed to setup trace management";
+            return false;
+        }
+        
         m_initialized = true;
         std::cout << "SEGY reader initialization completed successfully" << std::endl;
         
@@ -68,11 +81,9 @@ bool SEGYReader::initialize(const std::string& segyFilePath) {
 
 bool SEGYReader::setupDataProvider() {
     try {
-        // Simplified data provider setup for demonstration
-        // In a real implementation, you would use the OpenVDS SEGY import tools
-        std::cout << "Setting up SEGY file access for: " << m_segyFilePath << std::endl;
+        std::cout << "Setting up file access for: " << m_segyFilePath << std::endl;
         
-        // Basic file existence check
+        // Basic file existence and access check
         std::ifstream file(m_segyFilePath, std::ios::binary);
         if (!file.is_open()) {
             m_lastError = "Cannot open SEGY file: " + m_segyFilePath;
@@ -80,11 +91,11 @@ bool SEGYReader::setupDataProvider() {
         }
         file.close();
         
-        std::cout << "SEGY file access established" << std::endl;
+        std::cout << "File access setup completed" << std::endl;
         return true;
         
     } catch (const std::exception& e) {
-        m_lastError = std::string("Failed to setup SEGY file access: ") + e.what();
+        m_lastError = std::string("Failed to setup file access: ") + e.what();
         return false;
     }
 }
@@ -92,14 +103,26 @@ bool SEGYReader::setupDataProvider() {
 bool SEGYReader::scanSEGYFile() {
     try {
         std::cout << "Scanning SEGY file structure..." << std::endl;
+/*
+        // Extract comprehensive metadata
+        std::cout << "Extracting SEGY metadata..." << std::endl;
+        if (!SEGYMetadataExtractor::extractMetadata(m_segyFilePath, m_metadata)) {
+            std::cout << "Warning: Metadata extraction failed, using basic parsing" << std::endl;
+        }
         
+        // Analyze format compatibility
+        std::ifstream metaFile(m_segyFilePath, std::ios::binary);
+        if (metaFile.is_open()) {
+            SEGYMetadataExtractor::analyzeFormat(metaFile, m_formatInfo);
+            metaFile.close();
+        }
+*/           
         // Basic SEGY file parsing to get actual dimensions
         std::ifstream file(m_segyFilePath, std::ios::binary);
         if (!file.is_open()) {
             m_lastError = "Cannot open SEGY file for scanning: " + m_segyFilePath;
             return false;
         }
-        
         // Skip text headers (3200 bytes)
         file.seekg(3200);
         
@@ -196,6 +219,16 @@ bool SEGYReader::scanSEGYFile() {
         m_volumeInfo.crosslineCount = m_volumeInfo.crosslineEnd - m_volumeInfo.crosslineStart + 1;
         m_volumeInfo.totalTraces = traceCount;
         
+        // Extract real coordinate bounds from SEGY trace headers
+        if (!extractRealCoordinateBounds()) {
+            std::cout << "Warning: Failed to extract real coordinates, using fallback values" << std::endl;
+            // Fallback to mock values if extraction fails
+            m_volumeInfo.xMin = 100000.0;
+            m_volumeInfo.xMax = 105000.0;
+            m_volumeInfo.yMin = 200000.0;
+            m_volumeInfo.yMax = 204000.0;
+        }
+        
         std::cout << "SEGY scan completed:" << std::endl;
         std::cout << "  Inlines: " << m_volumeInfo.inlineStart << " - " << m_volumeInfo.inlineEnd 
                   << " (" << m_volumeInfo.inlineCount << " lines)" << std::endl;
@@ -244,6 +277,23 @@ void SEGYReader::calculateVolumeInfo() {
     std::cout << "Estimated data size: " << (totalBytes / (1024 * 1024)) << " MB" << std::endl;
 }
 
+bool SEGYReader::setupTraceManagement() {
+    try {
+        std::cout << "Setting up trace management..." << std::endl;
+        
+        // Calculate trace byte size
+        int bytesPerSample = 4; // Assume IEEE float for now
+        m_traceByteSize = 240 + m_volumeInfo.sampleCount * bytesPerSample; // 240 bytes header + sample data
+        
+        std::cout << "Trace management setup completed" << std::endl;
+        return true;
+        
+    } catch (const std::exception& e) {
+        m_lastError = std::string("Failed to setup trace management: ") + e.what();
+        return false;
+    }
+}
+
 bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>& traceData) {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -261,17 +311,158 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
         // Resize trace data vector
         traceData.resize(m_volumeInfo.sampleCount);
         
-        // Mock implementation - generate synthetic trace data
-        // In a real implementation, this would read actual SEGY trace data
-        for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
-            // Generate synthetic seismic-like data
-            double t = i * m_volumeInfo.sampleInterval / 1000.0; // time in seconds
-            double freq1 = 25.0; // Hz
-            double freq2 = 50.0; // Hz
-            
-            traceData[i] = float(0.5 * std::sin(2 * M_PI * freq1 * t) + 
-                                0.3 * std::sin(2 * M_PI * freq2 * t) +
-                                0.1 * (rand() / double(RAND_MAX) - 0.5)); // noise
+        // Calculate trace number from inline/crossline coordinates  
+        int64_t traceNumber = getTraceNumberFromCoordinates(inline_num, crossline_num);
+        if (traceNumber < 0) {
+            m_lastError = "Invalid trace coordinates";
+            return false;
+        }
+        
+        // Open SEGY file for reading
+        std::ifstream file(m_segyFilePath, std::ios::binary);
+        if (!file.is_open()) {
+            m_lastError = "Cannot open SEGY file for reading";
+            return false;
+        }
+        
+        // Calculate file position for this trace
+        // SEGY format: 3200 byte textual header + 400 byte binary header + traces
+        int64_t traceStartOffset = 3600 + traceNumber * m_traceByteSize;
+        
+        file.seekg(traceStartOffset);
+        if (!file.good()) {
+            m_lastError = "Failed to seek to trace position";
+            file.close();
+            return false;
+        }
+        
+        // Read trace header first (240 bytes) - we need to verify inline/crossline
+        char traceHeader[240];
+        file.read(traceHeader, 240);
+        if (file.gcount() != 240) {
+            m_lastError = "Failed to read trace header";
+            file.close();
+            return false;
+        }
+        
+        // Verify inline/crossline numbers from trace header  
+        int32_t fileInline, fileCrossline;
+        std::memcpy(&fileInline, &traceHeader[188], 4);   // Bytes 188-191: Inline
+        std::memcpy(&fileCrossline, &traceHeader[192], 4); // Bytes 192-195: Crossline
+        
+        // Convert from big-endian if needed
+        if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
+            fileInline = ntohl(fileInline);
+            fileCrossline = ntohl(fileCrossline);
+        }
+        
+        // For files without proper inline/crossline, skip verification
+        if (fileInline > 0 && fileCrossline > 0) {
+            if (fileInline != inline_num || fileCrossline != crossline_num) {
+                // Try to find the correct trace by scanning nearby traces
+                bool found = false;
+                const int maxSearchRange = 100;
+                
+                for (int offset = -maxSearchRange; offset <= maxSearchRange && !found; offset++) {
+                    int64_t searchTraceNum = traceNumber + offset;
+                    if (searchTraceNum < 0) continue;
+                    
+                    int64_t searchOffset = 3600 + searchTraceNum * m_traceByteSize;
+                    file.seekg(searchOffset);
+                    
+                    if (file.read(traceHeader, 240) && file.gcount() == 240) {
+                        std::memcpy(&fileInline, &traceHeader[188], 4);
+                        std::memcpy(&fileCrossline, &traceHeader[192], 4);
+                        
+                        if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
+                            fileInline = ntohl(fileInline);
+                            fileCrossline = ntohl(fileCrossline);
+                        }
+                        
+                        if (fileInline == inline_num && fileCrossline == crossline_num) {
+                            found = true;
+                            // Continue reading from this position
+                        }
+                    }
+                }
+                
+                if (!found) {
+                    // Use calculated position anyway, but warn
+                    std::cout << "Warning: Trace coordinates mismatch, using calculated position" << std::endl;
+                    file.seekg(traceStartOffset + 240); // Skip header
+                }
+            }
+        }
+        
+        // Read sample data
+        std::vector<char> rawSampleData(m_volumeInfo.sampleCount * 4); // Assume 4 bytes per sample
+        file.read(rawSampleData.data(), rawSampleData.size());
+        if (file.gcount() != static_cast<std::streamsize>(rawSampleData.size())) {
+            m_lastError = "Failed to read complete trace data";
+            file.close();
+            return false;
+        }
+        
+        file.close();
+        
+        // Convert binary data to float based on data format
+        switch (m_volumeInfo.dataFormat) {
+            case SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat: {
+                // IEEE 32-bit floating point
+                const float* floatData = reinterpret_cast<const float*>(rawSampleData.data());
+                for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
+                    float value = floatData[i];
+                    // Handle endianness conversion if needed
+                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
+                        uint32_t temp;
+                        std::memcpy(&temp, &value, 4);
+                        temp = ntohl(temp);
+                        std::memcpy(&value, &temp, 4);
+                    }
+                    traceData[i] = value;
+                }
+                break;
+            }
+            case SEGY::BinaryHeader::DataSampleFormatCode::Int32: {
+                // 32-bit integer
+                const int32_t* intData = reinterpret_cast<const int32_t*>(rawSampleData.data());
+                for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
+                    int32_t value = intData[i];
+                    // Handle endianness conversion if needed
+                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
+                        value = ntohl(value);
+                    }
+                    traceData[i] = static_cast<float>(value);
+                }
+                break;
+            }
+            case SEGY::BinaryHeader::DataSampleFormatCode::Int16: {
+                // 16-bit integer
+                const int16_t* shortData = reinterpret_cast<const int16_t*>(rawSampleData.data());
+                for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
+                    int16_t value = shortData[i];
+                    // Handle endianness conversion if needed
+                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
+                        value = ntohs(value);
+                    }
+                    traceData[i] = static_cast<float>(value);
+                }
+                break;
+            }
+            default:
+                // Fallback to IEEE Float format
+                const float* floatData = reinterpret_cast<const float*>(rawSampleData.data());
+                for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
+                    float value = floatData[i];
+                    if (m_volumeInfo.endianness == SEGY::Endianness::BigEndian) {
+                        uint32_t temp;
+                        std::memcpy(&temp, &value, 4);
+                        temp = ntohl(temp);
+                        std::memcpy(&value, &temp, 4);
+                    }
+                    traceData[i] = value;
+                }
+                break;
         }
         
         return true;
@@ -325,6 +516,7 @@ bool SEGYReader::readTraceRegion(int inlineStart, int inlineEnd,
                 idx += m_volumeInfo.sampleCount;
                 
                 tracesRead++;
+
             }
         }
         
@@ -335,4 +527,153 @@ bool SEGYReader::readTraceRegion(int inlineStart, int inlineEnd,
         m_lastError = std::string("Error reading trace region: ") + e.what();
         return false;
     }
+}
+
+bool SEGYReader::extractRealCoordinateBounds() {
+    try {
+        std::cout << "Extracting real coordinate bounds from SEGY headers..." << std::endl;
+        
+        std::ifstream file(m_segyFilePath, std::ios::binary);
+        if (!file.is_open()) {
+            std::cout << "Warning: Cannot open SEGY file for coordinate extraction" << std::endl;
+            return false;
+        }
+        
+        // Skip textual header (3200 bytes) and read binary header
+        file.seekg(3200, std::ios::beg);
+        
+        // Read key fields from binary header
+        char binaryHeader[400];
+        file.read(binaryHeader, 400);
+        if (!file.good()) {
+            std::cout << "Warning: Failed to read SEGY binary header" << std::endl;
+            return false;
+        }
+        
+        // Extract sample count from binary header (bytes 3220-3221, 0-based offset 20-21)
+        int16_t samplesPerTrace = 0;
+        std::memcpy(&samplesPerTrace, &binaryHeader[20], 2);
+        
+        // Handle endianness (SEGY is typically big endian)
+        samplesPerTrace = ntohs(samplesPerTrace);
+        
+        if (samplesPerTrace <= 0 || samplesPerTrace > 32000) {
+            std::cout << "Warning: Invalid samples per trace: " << samplesPerTrace << std::endl;
+            return false;
+        }
+        
+        // Calculate trace size: 240 bytes header + samples * 4 bytes (assuming float32)
+        size_t traceSize = 240 + samplesPerTrace * 4;
+        
+        // Skip to first trace (after 3200 byte textual + 400 byte binary headers)
+        file.seekg(3600, std::ios::beg);
+        
+        // Initialize coordinate bounds
+        double xMin = std::numeric_limits<double>::max();
+        double xMax = std::numeric_limits<double>::lowest();
+        double yMin = std::numeric_limits<double>::max();
+        double yMax = std::numeric_limits<double>::lowest();
+        
+        bool foundValidCoordinates = false;
+        int validCoordinateCount = 0;
+        int tracesScanned = 0;
+        const int maxTracesToScan = 1000; // Scan up to 1000 traces for coordinate bounds
+        
+        char traceHeader[240];
+        
+        while (file.good() && tracesScanned < maxTracesToScan) {
+            // Read trace header
+            file.read(traceHeader, 240);
+            if (file.gcount() != 240) {
+                break; // End of file or read error
+            }
+            
+            // Extract coordinates from trace header
+            // SEGY standard coordinate locations (0-based byte offsets):
+            // Bytes 180-183: CDP X coordinate (EnsembleXCoordinateHeaderField)
+            // Bytes 184-187: CDP Y coordinate (EnsembleYCoordinateHeaderField)  
+            // Bytes 70-71:   Coordinate scale factor (CoordinateScaleHeaderField)
+            
+            int32_t xCoord, yCoord;
+            int16_t coordinateScale;
+            
+            std::memcpy(&xCoord, &traceHeader[180], 4);
+            std::memcpy(&yCoord, &traceHeader[184], 4);
+            std::memcpy(&coordinateScale, &traceHeader[70], 2);
+            
+            // Convert from network byte order (big endian)
+            xCoord = ntohl(xCoord);
+            yCoord = ntohl(yCoord);
+            coordinateScale = ntohs(coordinateScale);
+            
+            // Check if coordinates are valid (non-zero)
+            if (xCoord != 0 || yCoord != 0) {
+                double x = static_cast<double>(xCoord);
+                double y = static_cast<double>(yCoord);
+                
+                // Apply coordinate scaling
+                if (coordinateScale > 0) {
+                    x *= coordinateScale;
+                    y *= coordinateScale;
+                } else if (coordinateScale < 0) {
+                    x /= -coordinateScale;
+                    y /= -coordinateScale;
+                }
+                
+                // Update bounds
+                xMin = std::min(xMin, x);
+                xMax = std::max(xMax, x);
+                yMin = std::min(yMin, y);
+                yMax = std::max(yMax, y);
+                
+                foundValidCoordinates = true;
+                validCoordinateCount++;
+            }
+            
+            // Skip to next trace
+            file.seekg(traceSize - 240, std::ios::cur);
+            tracesScanned++;
+        }
+        
+        file.close();
+        
+        if (!foundValidCoordinates) {
+            std::cout << "Warning: No valid coordinates found in " << tracesScanned << " trace headers" << std::endl;
+            return false;
+        }
+        
+        // Store the extracted coordinate bounds
+        m_volumeInfo.xMin = xMin;
+        m_volumeInfo.xMax = xMax;
+        m_volumeInfo.yMin = yMin;
+        m_volumeInfo.yMax = yMax;
+        
+        std::cout << "Successfully extracted coordinate bounds:" << std::endl;
+        std::cout << "  X range: " << xMin << " to " << xMax << std::endl;
+        std::cout << "  Y range: " << yMin << " to " << yMax << std::endl;
+        std::cout << "  Valid coordinates found: " << validCoordinateCount << " (scanned " << tracesScanned << " traces)" << std::endl;
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cout << "Exception during coordinate extraction: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+int64_t SEGYReader::getTraceNumberFromCoordinates(int inlineNum, int crosslineNum) {
+    // Simple calculation for regular grid - may need to be more sophisticated for irregular SEGY files
+    if (inlineNum < m_volumeInfo.inlineStart || inlineNum > m_volumeInfo.inlineEnd ||
+        crosslineNum < m_volumeInfo.crosslineStart || crosslineNum > m_volumeInfo.crosslineEnd) {
+        return -1; // Invalid coordinates
+    }
+    
+    // Calculate linear trace number from inline/crossline coordinates
+    int inlineIndex = inlineNum - m_volumeInfo.inlineStart;
+    int crosslineIndex = crosslineNum - m_volumeInfo.crosslineStart;
+    
+    // Assuming traces are organized in row-major order (inline varies fastest)
+    int64_t traceNumber = (int64_t)crosslineIndex * m_volumeInfo.inlineCount + inlineIndex;
+    
+    return traceNumber;
 }
