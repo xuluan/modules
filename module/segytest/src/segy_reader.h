@@ -151,6 +151,9 @@ private:
     bool extractRealCoordinateBounds();
     int64_t getTraceNumberFromCoordinates(int inlineNum, int crosslineNum);
     
+    // Find the actual trace number in file for given inline/crossline
+    int64_t findTraceNumber(std::ifstream& file, int inline_num, int crossline_num, int64_t estimatedTraceNumber);
+    
     // Endian conversion utilities
     static uint16_t swapEndian16(uint16_t value);
     static uint32_t swapEndian32(uint32_t value);

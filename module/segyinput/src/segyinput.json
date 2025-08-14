@@ -57,6 +57,30 @@
   "default": "193",
   "width": "default"
 },
+"sinterval_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of sample interval at binary header",
+  "format": "int",
+  "default": "17",
+  "width": "default"
+},
+"trace_length_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of trace length at binary header",
+  "format": "int",
+  "default": "21",
+  "width": "default"
+},
+"data_format_code_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of data format code at binary header",
+  "format": "int",
+  "default": "25",
+  "width": "default"
+},
 "attribute": {
   "required": false,
   "repeatable": true,

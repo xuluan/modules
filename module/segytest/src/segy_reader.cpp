@@ -426,9 +426,9 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
         // Resize trace data vector
         traceData.resize(m_volumeInfo.sampleCount);
         
-        // Calculate trace number from inline/crossline coordinates  
-        int64_t traceNumber = getTraceNumberFromCoordinates(inline_num, crossline_num);
-        if (traceNumber < 0) {
+        // Calculate estimated trace number from inline/crossline coordinates  
+        int64_t estimatedTraceNumber = getTraceNumberFromCoordinates(inline_num, crossline_num);
+        if (estimatedTraceNumber < 0) {
             m_lastError = "Invalid trace coordinates";
             return false;
         }
@@ -440,60 +440,21 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
             return false;
         }
         
-        // Calculate file position for this trace
-        // SEGY format: textual header + binary header + traces
-        int64_t traceStartOffset = SEGY_TOTAL_HEADER_SIZE + traceNumber * m_traceByteSize;
+        // Find the actual trace number in the file
+        int64_t actualTraceNumber = findTraceNumber(file, inline_num, crossline_num, estimatedTraceNumber);
+        if (actualTraceNumber < 0) {
+            m_lastError = "Failed to find trace in file";
+            file.close();
+            return false;
+        }
         
-        file.seekg(traceStartOffset);
+        // Seek to the trace data position (skip trace header)
+        int64_t traceDataOffset = SEGY_TOTAL_HEADER_SIZE + actualTraceNumber * m_traceByteSize + SEGY_TRACE_HEADER_SIZE;
+        file.seekg(traceDataOffset);
         if (!file.good()) {
-            m_lastError = "Failed to seek to trace position";
+            m_lastError = "Failed to seek to trace data position";
             file.close();
             return false;
-        }
-        
-        // Read trace header first - we need to verify inline/crossline
-        char traceHeader[SEGY_TRACE_HEADER_SIZE];
-        file.read(traceHeader, SEGY_TRACE_HEADER_SIZE);
-        if (file.gcount() != SEGY_TRACE_HEADER_SIZE) {
-            m_lastError = "Failed to read trace header";
-            file.close();
-            return false;
-        }
-        
-        // Verify inline/crossline numbers from trace header  
-        int32_t fileInline = readInt32BE(&traceHeader[SEGY_TRC_INLINE_OFFSET]);
-        int32_t fileCrossline = readInt32BE(&traceHeader[SEGY_TRC_CROSSLINE_OFFSET]);
-        
-        // For files without proper inline/crossline, skip verification
-        if (fileInline > 0 && fileCrossline > 0) {
-            if (fileInline != inline_num || fileCrossline != crossline_num) {
-                // Try to find the correct trace by scanning nearby traces
-                bool found = false;
-                
-                for (int offset = -SEGY_TRACE_SEARCH_RANGE; offset <= SEGY_TRACE_SEARCH_RANGE && !found; offset++) {
-                    int64_t searchTraceNum = traceNumber + offset;
-                    if (searchTraceNum < 0) continue;
-                    
-                    int64_t searchOffset = SEGY_TOTAL_HEADER_SIZE + searchTraceNum * m_traceByteSize;
-                    file.seekg(searchOffset);
-                    
-                    if (file.read(traceHeader, SEGY_TRACE_HEADER_SIZE) && file.gcount() == SEGY_TRACE_HEADER_SIZE) {
-                        fileInline = readInt32BE(&traceHeader[SEGY_TRC_INLINE_OFFSET]);
-                        fileCrossline = readInt32BE(&traceHeader[SEGY_TRC_CROSSLINE_OFFSET]);
-                        
-                        if (fileInline == inline_num && fileCrossline == crossline_num) {
-                            found = true;
-                            // Continue reading from this position
-                        }
-                    }
-                }
-                
-                if (!found) {
-                    // Use calculated position anyway, but warn
-                    std::cout << "Warning: Trace coordinates mismatch, using calculated position" << std::endl;
-                    file.seekg(traceStartOffset + SEGY_TRACE_HEADER_SIZE); // Skip header
-                }
-            }
         }
         
         // Read sample data  
@@ -751,6 +712,62 @@ int64_t SEGYReader::getTraceNumberFromCoordinates(int inlineNum, int crosslineNu
     int64_t traceNumber = (int64_t)crosslineIndex * m_volumeInfo.inlineCount + inlineIndex;
     
     return traceNumber;
+}
+
+int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inline_num, int crossline_num, int64_t estimatedTraceNumber) {
+    // Calculate file position for the estimated trace
+    int64_t traceStartOffset = SEGY_TOTAL_HEADER_SIZE + estimatedTraceNumber * m_traceByteSize;
+    
+    file.seekg(traceStartOffset);
+    if (!file.good()) {
+        return -1; // Failed to seek
+    }
+    
+    // Read trace header first - we need to verify inline/crossline
+    char traceHeader[SEGY_TRACE_HEADER_SIZE];
+    file.read(traceHeader, SEGY_TRACE_HEADER_SIZE);
+    if (file.gcount() != SEGY_TRACE_HEADER_SIZE) {
+        return -1; // Failed to read trace header
+    }
+    
+    // Verify inline/crossline numbers from trace header  
+    int32_t fileInline = readInt32BE(&traceHeader[SEGY_TRC_INLINE_OFFSET]);
+    int32_t fileCrossline = readInt32BE(&traceHeader[SEGY_TRC_CROSSLINE_OFFSET]);
+    
+    // For files without proper inline/crossline, return estimated position
+    if (fileInline <= 0 || fileCrossline <= 0) {
+        return estimatedTraceNumber;
+    }
+    
+    // If coordinates match, return the estimated trace number
+    if (fileInline == inline_num && fileCrossline == crossline_num) {
+        //std::cout << "MATCH inline_num " << inline_num << " crossline_num " << crossline_num << std::endl;           
+        return estimatedTraceNumber;
+    }
+    
+    // Try to find the correct trace by scanning nearby traces
+    for (int offset = -SEGY_TRACE_SEARCH_RANGE; offset <= SEGY_TRACE_SEARCH_RANGE; offset++) {
+        if (offset == 0) continue; // Already checked this one
+        
+        int64_t searchTraceNum = estimatedTraceNumber + offset;
+        if (searchTraceNum < 0) continue;
+        
+        int64_t searchOffset = SEGY_TOTAL_HEADER_SIZE + searchTraceNum * m_traceByteSize;
+        file.seekg(searchOffset);
+        
+        if (file.read(traceHeader, SEGY_TRACE_HEADER_SIZE) && file.gcount() == SEGY_TRACE_HEADER_SIZE) {
+            fileInline = readInt32BE(&traceHeader[SEGY_TRC_INLINE_OFFSET]);
+            fileCrossline = readInt32BE(&traceHeader[SEGY_TRC_CROSSLINE_OFFSET]);
+            
+            if (fileInline == inline_num && fileCrossline == crossline_num) {
+                return searchTraceNum; // Found the correct trace
+            }
+        }
+    }
+    
+    // Not found, return estimated position with warning
+    std::cout << "Warning: Trace coordinates mismatch, using calculated position, inline_num " << inline_num << " crossline_num " << crossline_num << std::endl;
+    return estimatedTraceNumber;
 }
 
 bool SEGYReader::printTextualHeader() const {
