@@ -25,6 +25,7 @@
 // Binary header field offsets (0-based, from start of binary header)
 #define SEGY_BIN_SAMPLE_INTERVAL_OFFSET 16      // Sample interval in microseconds (bytes 3216-3217)
 #define SEGY_BIN_SAMPLES_PER_TRACE_OFFSET 20    // Number of samples per trace (bytes 3220-3221)
+#define SEGY_BIN_DATA_FORMAT_OFFSET 24          // Data format code (bytes 3224-3225)
 
 // Trace header field offsets (0-based, from start of trace header)  
 #define SEGY_TRC_COORD_SCALE_OFFSET     70      // Coordinate scalar (bytes 70-71)
@@ -63,7 +64,8 @@ namespace SEGY {
             Unknown = 0,
             IEEEFloat = 5,
             Int32 = 2,
-            Int16 = 3
+            Int16 = 3,
+            Int8 = 8
         };
     }
     
@@ -160,6 +162,12 @@ private:
     
     // EBCDIC to ASCII conversion utility
     static char ebcdicToAscii(unsigned char ebcdicChar);
+    
+    // Convert SEGY data format code to enum
+    static SEGY::BinaryHeader::DataSampleFormatCode convertDataFormatCode(uint16_t formatCode);
+    
+    // Get bytes per sample for a given data format
+    static size_t getBytesPerSample(SEGY::BinaryHeader::DataSampleFormatCode dataFormat);
     
     // Member variables
     std::string m_segyFilePath;

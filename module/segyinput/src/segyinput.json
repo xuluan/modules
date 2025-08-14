@@ -73,16 +73,14 @@
   "datatype": {
   "type": "choice",
   "required": true,
-  "help": "The data type of the current attribute: int8, int16, int32, int64, float and double.",
+  "help": "The data type of the current attribute: int8, int16, int32 and float.",
   "format": "text",
   "default": "float",
   "options": [
     "int8",
     "int16",
     "int32",
-    "int64",            
-    "float",
-    "double"  
+    "float"
   ]
   },
   "offset": {

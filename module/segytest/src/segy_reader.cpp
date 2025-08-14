@@ -98,6 +98,36 @@ char SEGYReader::ebcdicToAscii(unsigned char ebcdicChar) {
     }
 }
 
+SEGY::BinaryHeader::DataSampleFormatCode SEGYReader::convertDataFormatCode(uint16_t formatCode) {
+    // Convert SEGY data format code to our enum
+    // Based on SEG-Y Rev 1 specification
+    switch (formatCode) {
+        case 1: return SEGY::BinaryHeader::DataSampleFormatCode::Int32;   // 4-byte two's complement integer
+        case 2: return SEGY::BinaryHeader::DataSampleFormatCode::Int32;   // 4-byte two's complement integer
+        case 3: return SEGY::BinaryHeader::DataSampleFormatCode::Int16;   // 2-byte two's complement integer
+        case 5: return SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat; // 4-byte IEEE floating-point
+        case 8: return SEGY::BinaryHeader::DataSampleFormatCode::Int8;    // 1-byte two's complement integer
+        default:
+            std::cout << "Warning: Unknown data format code " << formatCode << ", defaulting to IEEE Float" << std::endl;
+            return SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat;
+    }
+}
+
+size_t SEGYReader::getBytesPerSample(SEGY::BinaryHeader::DataSampleFormatCode dataFormat) {
+    switch (dataFormat) {
+        case SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat:
+            return SEGY_FLOAT32_SIZE;
+        case SEGY::BinaryHeader::DataSampleFormatCode::Int32:
+            return SEGY_INT32_SIZE;
+        case SEGY::BinaryHeader::DataSampleFormatCode::Int16:
+            return SEGY_INT16_SIZE;
+        case SEGY::BinaryHeader::DataSampleFormatCode::Int8:
+            return 1;
+        default:
+            return SEGY_FLOAT32_SIZE; // Fallback
+    }
+}
+
 SEGYReader::~SEGYReader() = default;
 
 bool SEGYReader::initialize(const std::string& segyFilePath) {
@@ -206,6 +236,12 @@ bool SEGYReader::scanSEGYFile() {
         // Extract sample interval from binary header  
         uint16_t sampleIntervalMicros = readUInt16BE(&binaryHeader[SEGY_BIN_SAMPLE_INTERVAL_OFFSET]);
         
+        // Extract data format code from binary header
+        uint16_t dataFormatCode = readUInt16BE(&binaryHeader[SEGY_BIN_DATA_FORMAT_OFFSET]);
+        SEGY::BinaryHeader::DataSampleFormatCode dataFormat = convertDataFormatCode(dataFormatCode);
+        
+        std::cout << "  Data format code: " << dataFormatCode << std::endl;
+        
         // Scan traces to find actual inline/crossline ranges
         file.seekg(SEGY_TOTAL_HEADER_SIZE); // Start of trace data
         
@@ -213,8 +249,9 @@ bool SEGYReader::scanSEGYFile() {
         int minCrossline = INT_MAX, maxCrossline = INT_MIN;
         int traceCount = 0;
         
-        // Calculate trace size: trace header + samples (assuming float)
-        size_t traceSize = SEGY_TRACE_HEADER_SIZE + samplesPerTrace * SEGY_FLOAT32_SIZE;
+        // Calculate trace size based on actual data format
+        size_t bytesPerSample = getBytesPerSample(dataFormat);
+        size_t traceSize = SEGY_TRACE_HEADER_SIZE + samplesPerTrace * bytesPerSample;
         
         while (file.good() && !file.eof()) {
             // Read trace header
@@ -240,7 +277,7 @@ bool SEGYReader::scanSEGYFile() {
             traceCount++;
             
             // Skip trace data
-            file.seekg(file.tellg() + std::streamoff(samplesPerTrace * SEGY_FLOAT32_SIZE));
+            file.seekg(file.tellg() + std::streamoff(samplesPerTrace * bytesPerSample));
             
             // Limit scanning for very large files
             //if (traceCount > SEGY_MAX_TRACE_SCAN_COUNT) break;
@@ -249,7 +286,7 @@ bool SEGYReader::scanSEGYFile() {
         file.close();
         
         // Set volume info from scanned data
-        m_volumeInfo.dataFormat = SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat;
+        m_volumeInfo.dataFormat = dataFormat;  // Use actual format from file
         m_volumeInfo.endianness = SEGY::Endianness::BigEndian;
         m_volumeInfo.sampleInterval = sampleIntervalMicros;
         m_volumeInfo.startTime = 0.0;
@@ -289,6 +326,25 @@ bool SEGYReader::scanSEGYFile() {
         }
         
         std::cout << "SEGY scan completed:" << std::endl;
+        std::cout << "  Data format: " << dataFormatCode << " (";
+        switch (dataFormat) {
+            case SEGY::BinaryHeader::DataSampleFormatCode::IEEEFloat:
+                std::cout << "IEEE Float";
+                break;
+            case SEGY::BinaryHeader::DataSampleFormatCode::Int32:
+                std::cout << "32-bit Integer";
+                break;
+            case SEGY::BinaryHeader::DataSampleFormatCode::Int16:
+                std::cout << "16-bit Integer";
+                break;
+            case SEGY::BinaryHeader::DataSampleFormatCode::Int8:
+                std::cout << "8-bit Integer";
+                break;
+            default:
+                std::cout << "Unknown";
+                break;
+        }
+        std::cout << ")" << std::endl;
         std::cout << "  Inlines: " << m_volumeInfo.inlineStart << " - " << m_volumeInfo.inlineEnd 
                   << " (" << m_volumeInfo.inlineCount << " lines)" << std::endl;
         std::cout << "  Crosslines: " << m_volumeInfo.crosslineStart << " - " << m_volumeInfo.crosslineEnd
@@ -329,8 +385,8 @@ void SEGYReader::calculateVolumeInfo() {
     // Additional calculations based on scanned data
     std::cout << "Calculating volume information..." << std::endl;
     
-    // Calculate approximate data size
-    size_t bytesPerSample = SEGY_FLOAT32_SIZE; // Assuming float data
+    // Calculate approximate data size based on actual format
+    size_t bytesPerSample = getBytesPerSample(m_volumeInfo.dataFormat);
     size_t totalBytes = m_volumeInfo.totalTraces * m_volumeInfo.sampleCount * bytesPerSample;
     
     std::cout << "Estimated data size: " << (totalBytes / SEGY_BYTES_PER_MB) << " MB" << std::endl;
@@ -340,8 +396,8 @@ bool SEGYReader::setupTraceManagement() {
     try {
         std::cout << "Setting up trace management..." << std::endl;
         
-        // Calculate trace byte size
-        int bytesPerSample = SEGY_FLOAT32_SIZE; // Assume IEEE float for now
+        // Calculate trace byte size based on actual format
+        size_t bytesPerSample = getBytesPerSample(m_volumeInfo.dataFormat);
         m_traceByteSize = SEGY_TRACE_HEADER_SIZE + m_volumeInfo.sampleCount * bytesPerSample; // trace header + sample data
         
         std::cout << "Trace management setup completed" << std::endl;
@@ -441,7 +497,8 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
         }
         
         // Read sample data  
-        std::vector<char> rawSampleData(m_volumeInfo.sampleCount * SEGY_FLOAT32_SIZE); // Assume 4 bytes per sample
+        size_t bytesPerSample = getBytesPerSample(m_volumeInfo.dataFormat);
+        std::vector<char> rawSampleData(m_volumeInfo.sampleCount * bytesPerSample);
         file.read(rawSampleData.data(), rawSampleData.size());
         if (file.gcount() != static_cast<std::streamsize>(rawSampleData.size())) {
             m_lastError = "Failed to read complete trace data";
@@ -476,10 +533,18 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
                 }
                 break;
             }
+            case SEGY::BinaryHeader::DataSampleFormatCode::Int8: {
+                // 8-bit integer
+                for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
+                    int8_t value = static_cast<int8_t>(rawSampleData[i]);
+                    traceData[i] = static_cast<float>(value);
+                }
+                break;
+            }
             default:
                 // Fallback to IEEE Float format
                 for (int i = 0; i < m_volumeInfo.sampleCount; i++) {
-                    traceData[i] = readFloatBE(&rawSampleData[i * SEGY_FLOAT32_SIZE]);
+                    traceData[i] = readFloatBE(&rawSampleData[i * bytesPerSample]);
                 }
                 break;
         }
@@ -577,8 +642,12 @@ bool SEGYReader::extractRealCoordinateBounds() {
             return false;
         }
         
-        // Calculate trace size: trace header + samples (assuming float32)
-        size_t traceSize = SEGY_TRACE_HEADER_SIZE + samplesPerTrace * SEGY_FLOAT32_SIZE;
+        // Extract data format and calculate trace size based on actual format
+        uint16_t dataFormatCode = readUInt16BE(&binaryHeader[SEGY_BIN_DATA_FORMAT_OFFSET]);
+        SEGY::BinaryHeader::DataSampleFormatCode dataFormat = convertDataFormatCode(dataFormatCode);
+        
+        size_t bytesPerSample = getBytesPerSample(dataFormat);
+        size_t traceSize = SEGY_TRACE_HEADER_SIZE + samplesPerTrace * bytesPerSample;
         
         // Skip to first trace (after textual + binary headers)
         file.seekg(SEGY_TOTAL_HEADER_SIZE, std::ios::beg);
@@ -595,7 +664,7 @@ bool SEGYReader::extractRealCoordinateBounds() {
         
         char traceHeader[SEGY_TRACE_HEADER_SIZE];
         
-        while (file.good() && tracesScanned < SEGY_MAX_COORD_SCAN_COUNT) {
+        while (file.good()) {
             // Read trace header
             file.read(traceHeader, SEGY_TRACE_HEADER_SIZE);
             if (file.gcount() != SEGY_TRACE_HEADER_SIZE) {
