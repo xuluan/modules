@@ -45,7 +45,8 @@ void testgendata_init(const char* myid, const char* buf)
         my_data->fpkey = primarykey.at("first", "primarykey").as_int();
         my_data->lpkey = primarykey.at("last", "primarykey").as_int();
         my_data->pkinc = primarykey.at("step", "primarykey").as_int();
-        
+        my_data->current_pkey = my_data->fpkey;
+
         my_data->pkeys.clear();
         for (int i = my_data->fpkey; i <= my_data->lpkey;) {
             my_data->pkeys.push_back(i);

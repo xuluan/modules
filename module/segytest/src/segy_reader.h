@@ -136,6 +136,9 @@ public:
     // Error handling
     const std::string& getLastError() const { return m_lastError; }
     
+    // Print 3200-byte textual header content
+    bool printTextualHeader() const;
+    
 private:
     // Private implementation details
     bool scanSEGYFile();
@@ -154,6 +157,9 @@ private:
     static uint16_t readUInt16BE(const void* data);
     static uint32_t readUInt32BE(const void* data);
     static float readFloatBE(const void* data);
+    
+    // EBCDIC to ASCII conversion utility
+    static char ebcdicToAscii(unsigned char ebcdicChar);
     
     // Member variables
     std::string m_segyFilePath;

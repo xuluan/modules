@@ -97,7 +97,7 @@ int main() {
     SEGYReader reader;
     
     // SEGY文件路径
-    std::string segyFilePath = "../Demo.segy";
+    std::string segyFilePath = "Demo.segy";
     
     std::cout << "Initializing SEGY reader for file: " << segyFilePath << std::endl;
     
@@ -107,8 +107,11 @@ int main() {
         return 1;
     }
     
+    reader.printTextualHeader();
+
     // 打印SEGY文件信息
     printSEGYInfo(reader);
+    
     
     // 获取体积信息
     const SEGYVolumeInfo& volumeInfo = reader.getVolumeInfo();
