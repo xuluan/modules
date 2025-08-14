@@ -15,6 +15,47 @@
 
 // Note: Using simplified approach without OpenVDS dependencies
 
+// SEGY Format Constants (based on SEG-Y Revision 1 specification)
+// File structure constants
+#define SEGY_TEXTUAL_HEADER_SIZE        3200    // EBCDIC text header size
+#define SEGY_BINARY_HEADER_SIZE         400     // Binary header size  
+#define SEGY_TRACE_HEADER_SIZE          240     // Trace header size
+#define SEGY_TOTAL_HEADER_SIZE          (SEGY_TEXTUAL_HEADER_SIZE + SEGY_BINARY_HEADER_SIZE)  // 3600
+
+// Binary header field offsets (0-based, from start of binary header)
+#define SEGY_BIN_SAMPLE_INTERVAL_OFFSET 16      // Sample interval in microseconds (bytes 3216-3217)
+#define SEGY_BIN_SAMPLES_PER_TRACE_OFFSET 20    // Number of samples per trace (bytes 3220-3221)
+
+// Trace header field offsets (0-based, from start of trace header)  
+#define SEGY_TRC_COORD_SCALE_OFFSET     70      // Coordinate scalar (bytes 70-71)
+#define SEGY_TRC_X_COORD_OFFSET         72     // CDP X coordinate (bytes 180-183)
+#define SEGY_TRC_Y_COORD_OFFSET         76     // CDP Y coordinate (bytes 184-187)
+#define SEGY_TRC_INLINE_OFFSET          4     // Inline number (bytes 188-191)
+#define SEGY_TRC_CROSSLINE_OFFSET       20     // Crossline number (bytes 192-195)
+
+// Data type sizes
+#define SEGY_FLOAT32_SIZE               4       // IEEE 32-bit float
+#define SEGY_INT32_SIZE                 4       // 32-bit integer
+#define SEGY_INT16_SIZE                 2       // 16-bit integer
+
+// Validation constants
+#define SEGY_MAX_SAMPLES_PER_TRACE      32000   // Maximum reasonable samples per trace
+#define SEGY_MAX_TRACE_SCAN_COUNT       10000   // Maximum traces to scan for analysis
+#define SEGY_MAX_COORD_SCAN_COUNT       1000    // Maximum traces to scan for coordinates
+#define SEGY_TRACE_SEARCH_RANGE         100     // Range for trace coordinate search
+
+// Default fallback values
+#define SEGY_DEFAULT_INLINE_START       1000    // Default inline start if not found
+#define SEGY_DEFAULT_CROSSLINE_START    2000    // Default crossline start if not found
+#define SEGY_DEFAULT_X_MIN              100000.0 // Default X coordinate minimum
+#define SEGY_DEFAULT_X_MAX              105000.0 // Default X coordinate maximum  
+#define SEGY_DEFAULT_Y_MIN              200000.0 // Default Y coordinate minimum
+#define SEGY_DEFAULT_Y_MAX              204000.0 // Default Y coordinate maximum
+
+// Memory constants
+#define SEGY_BYTES_PER_MB               (1024 * 1024)   // Bytes per megabyte
+#define SEGY_DEFAULT_TRACES_PER_PAGE    1000            // Default traces per page
+
 // Simple SEGY enums for this demonstration
 namespace SEGY {
     namespace BinaryHeader {

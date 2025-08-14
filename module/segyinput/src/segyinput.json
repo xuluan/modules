@@ -12,15 +12,83 @@
   "button": "file",
   "filefilter": "*.vds"
 },
-"sliceposition":{
+"run_mode":{
+  "type": "choice",
+  "required": true,
+  "help": "Indicating the operation mode: dry-run: only prints 3200 bytes of the text header (80*40), actual-run: executes the normal SEGY input operation",
+  "format": "text",
+  "default": "actual-run",
+  "options": [
+    "dry-run",
+    "actual-run"
+  ]
+},
+"primary_name": {
+    "type": "argument",
+    "required": false,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "default": "INLINE",
+    "help": "The name of the primary key"
+},
+"primary_offset":{
   "type": "argument",
   "required": false,
-  "help": "Indicate on which axis to read the slice. By default, get slices on primary key. Possible values are 'on_primary_key', 'on_secondary_key', and 'on_data_samples'",
+  "help": "the offset of primary number at trace headers",
+  "format": "int",
+  "default": "189",
+  "width": "default"
+},
+"secondary_name": {
+    "type": "argument",
+    "required": false,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "default": "CROSSLINE",
+    "help": "The name of the secondary key"
+},
+"secondary_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of crossline number at trace headers",
+  "format": "int",
+  "default": "193",
+  "width": "default"
+},
+"attribute": {
+  "required": false,
+  "repeatable": true,
+  "type": "procedure",
+  "help": "the attribute from segy trace headers",
+  "name": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "Name of the attribute"
+  },
+  "datatype": {
+  "type": "choice",
+  "required": true,
+  "help": "The data type of the current attribute: int8, int16, int32, int64, float and double.",
   "format": "text",
-  "default": "on_primary_key",
+  "default": "float",
   "options": [
-    "on_primary_key",
-    "on_secondary_key",
-    "on_data_samples"
+    "int8",
+    "int16",
+    "int32",
+    "int64",            
+    "float",
+    "double"  
   ]
+  },
+  "offset": {
+    "type": "argument",
+    "required": true,
+    "help": "the offset of attribute at trace headers",
+    "format": "int",
+  }
 }
