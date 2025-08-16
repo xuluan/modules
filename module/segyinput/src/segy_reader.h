@@ -85,7 +85,11 @@ struct SEGYFileInfo {
     
     SEGY::HeaderField primaryKey;
     SEGY::HeaderField secondaryKey;
-    
+
+    SEGY::HeaderField numSamplesKey;
+    SEGY::HeaderField sampleIntervalKey;
+    SEGY::HeaderField dataSampleFormatCodeKey;
+
     std::vector<SEGYSegmentInfo> segments; // Single file segments only
     
     // Coordinate range information for trace index calculation

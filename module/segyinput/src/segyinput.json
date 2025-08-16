@@ -7,10 +7,10 @@
   "required": true,
   "format": "text",
   "default": "",
-  "help": "The full path of the segyinput dataset, ie, /full/path/to/the/segyinput_data.vds",
+  "help": "The full path of the segyinput dataset, ie, /full/path/to/the/segyinput_data.segy",
   "width": "full",
   "button": "file",
-  "filefilter": "*.vds"
+  "filefilter": "*.segy"
 },
 "run_mode":{
   "type": "choice",
@@ -56,6 +56,15 @@
   "format": "int",
   "default": "193",
   "width": "default"
+},
+"data_name": {
+    "type": "argument",
+    "required": false,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "default": "TRACE",
+    "help": "The name of the data key"
 },
 "sinterval_offset":{
   "type": "argument",

@@ -37,6 +37,11 @@ include(gdlogger_libs)
 target_link_libraries(segyinput PRIVATE
             gdlogger_libs)
 
+list(APPEND CMAKE_MODULE_PATH $ENV{GDUTILITY_DIR}/cmake)
+include(gdutility_libs)
+target_link_libraries(segyinput PRIVATE
+            gdutility_libs)                
+
 install(TARGETS
   segyinput
   RUNTIME

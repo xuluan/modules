@@ -5,15 +5,37 @@
 #include <memory>
 #include <GdLogger.h>
 #include <VdsStore.h>
+#include <string>
+#include "segy_reader.h"
 
 struct Segyinput {
-  int pkey_dim;                 // the dimension of the pkey in VDS
-  int current_pkey_index;
-  std::vector<int> pkeys;
-  std::vector<int> skeys;
-  void* logger;
-  ovds::VdsStore* vsid;
-  std::string data_url;
+    std::string data_url;
+    bool is_dry_run;
+
+    std::string pkey_name;
+    std::string skey_name;
+    std::string trace_name;
+    int primary_offset;
+    int secondary_offset;
+    int sinterval_offset;
+    int trace_length_offset;
+    int data_format_code_offset;
+    std::string trace_unit;
+    int fpkey;
+    int lpkey;
+    int fskey;
+    int lskey;
+    int pkinc;
+    int skinc;
+    int trace_length;
+    float tmin;
+    float tmax;
+    int num_skey;
+    int current_pkey_index;
+    float* trace_buf;
+    std::vector<int> pkeys;
+    std::vector<int> skeys;
+    void* logger;
 };
 
 #ifdef __cplusplus

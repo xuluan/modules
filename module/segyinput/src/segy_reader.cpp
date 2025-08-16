@@ -52,12 +52,12 @@ void SEGYReader::AddCustomField(const std::string& name, int byteLocation, int w
 }
 
 SEGY::Endianness SEGYReader::DetectEndianness(const char* binaryHeader, const char* firstTraceHeader) {
-    int intervalBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, SEGY::BinaryHeader::SampleIntervalHeaderField, SEGY::Endianness::BigEndian);
-    int intervalLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, SEGY::BinaryHeader::SampleIntervalHeaderField, SEGY::Endianness::LittleEndian);
-    int samplesBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, SEGY::BinaryHeader::NumSamplesHeaderField, SEGY::Endianness::BigEndian);
-    int samplesLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, SEGY::BinaryHeader::NumSamplesHeaderField, SEGY::Endianness::LittleEndian);
-    int formatBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, SEGY::BinaryHeader::DataSampleFormatCodeHeaderField, SEGY::Endianness::BigEndian);
-    int formatLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, SEGY::BinaryHeader::DataSampleFormatCodeHeaderField, SEGY::Endianness::LittleEndian);
+    int intervalBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
+    int intervalLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
+    int samplesBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
+    int samplesLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
+    int formatBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
+    int formatLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
     
     std::cout << "Endianness detection:" << std::endl;
     std::cout << "  Binary Header - BE: interval=" << intervalBE_bin << ", samples=" << samplesBE_bin << ", format=" << formatBE_bin << std::endl;
@@ -578,6 +578,19 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
         std::cerr << "Error: Cannot open file " << m_filename << std::endl;
         return false;
     }
+
+    // Set primary and secondary key fields
+    m_fileInfo.primaryKey = m_customFields.find("inlinenumber") != m_customFields.end() ? 
+        m_customFields["inlinenumber"] : SEGY::TraceHeader::InlineNumberHeaderField;
+    m_fileInfo.secondaryKey = m_customFields.find("crosslinenumber") != m_customFields.end() ? 
+        m_customFields["crosslinenumber"] : SEGY::TraceHeader::CrosslineNumberHeaderField;
+    m_fileInfo.numSamplesKey = m_customFields.find("numSamplesKey") != m_customFields.end() ? 
+        m_customFields["numSamplesKey"] : SEGY::BinaryHeader::NumSamplesHeaderField;
+    m_fileInfo.sampleIntervalKey = m_customFields.find("sampleIntervalKey") != m_customFields.end() ?
+        m_customFields["sampleIntervalKey"] : SEGY::BinaryHeader::SampleIntervalHeaderField;
+    m_fileInfo.dataSampleFormatCodeKey = m_customFields.find("dataSampleFormatCodeKey") != m_customFields.end() ?
+        m_customFields["dataSampleFormatCodeKey"] : SEGY::BinaryHeader::DataSampleFormatCodeHeaderField;
+
     
     // Get file size
     file.seekg(0, std::ios::end);
@@ -602,10 +615,10 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
     m_fileInfo.headerEndianness = DetectEndianness(binaryHeader.data(), firstTraceHeader.data());
     
     // Read file parameters
-    int interval = SEGY::ReadFieldFromHeader(binaryHeader.data(), SEGY::BinaryHeader::SampleIntervalHeaderField, m_fileInfo.headerEndianness);
-    int samples = SEGY::ReadFieldFromHeader(binaryHeader.data(), SEGY::BinaryHeader::NumSamplesHeaderField, m_fileInfo.headerEndianness);
-    int format = SEGY::ReadFieldFromHeader(binaryHeader.data(), SEGY::BinaryHeader::DataSampleFormatCodeHeaderField, m_fileInfo.headerEndianness);
-    
+    int interval = SEGY::ReadFieldFromHeader(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
+    int samples = SEGY::ReadFieldFromHeader(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
+    int format = SEGY::ReadFieldFromHeader(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
+
     // If binary header invalid, read from trace header
     if (interval <= 0 || samples <= 0) {
         std::cout << "Binary header invalid, using trace header..." << std::endl;
@@ -636,12 +649,6 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
     m_fileInfo.traceByteSize = SEGY::TraceHeaderSize + m_fileInfo.sampleCount * sampleSize;
     int64_t dataSize = fileSize - SEGY::TextualFileHeaderSize - SEGY::BinaryFileHeaderSize;
     m_fileInfo.totalTraces = dataSize / m_fileInfo.traceByteSize;
-    
-    // Set primary and secondary key fields
-    m_fileInfo.primaryKey = m_customFields.find("inlinenumber") != m_customFields.end() ? 
-        m_customFields["inlinenumber"] : SEGY::TraceHeader::InlineNumberHeaderField;
-    m_fileInfo.secondaryKey = m_customFields.find("crosslinenumber") != m_customFields.end() ? 
-        m_customFields["crosslinenumber"] : SEGY::TraceHeader::CrosslineNumberHeaderField;
     
     // **Use true OpenVDS segment building algorithm**
     BuildSegmentInfo(file);
