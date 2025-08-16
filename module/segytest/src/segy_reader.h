@@ -12,6 +12,7 @@
 #include <memory>
 #include <cstdint>
 #include <functional>
+#include <unordered_map>
 
 // Note: Using simplified approach without OpenVDS dependencies
 
@@ -149,10 +150,7 @@ private:
     bool setupDataProvider();
     bool setupTraceManagement();
     bool extractRealCoordinateBounds();
-    int64_t getTraceNumberFromCoordinates(int inlineNum, int crosslineNum);
-    
-    // Find the actual trace number in file for given inline/crossline
-    int64_t findTraceNumber(std::ifstream& file, int inline_num, int crossline_num, int64_t estimatedTraceNumber);
+    int64_t findTraceNumber(int inlineNum, int crosslineNum);
     
     // Endian conversion utilities
     static uint16_t swapEndian16(uint16_t value);
@@ -171,6 +169,11 @@ private:
     
     // Get bytes per sample for a given data format
     static size_t getBytesPerSample(SEGY::BinaryHeader::DataSampleFormatCode dataFormat);
+    
+    // Coordinate mapping utilities
+    static uint64_t packCoordinates(int inline_num, int crossline_num);
+    static void unpackCoordinates(uint64_t packed, int& inline_num, int& crossline_num);
+    bool buildCoordinateMapping();
     
     // Member variables
     std::string m_segyFilePath;
@@ -193,6 +196,9 @@ private:
     // Additional members for trace management
     int64_t m_traceByteSize;
     int64_t m_tracesPerPage;
+    
+    // Coordinate to trace number mapping
+    std::unordered_map<uint64_t, int64_t> m_coordinateToTraceMap;
 };
 
 #endif // SEGY_READER_H

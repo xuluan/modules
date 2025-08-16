@@ -149,9 +149,9 @@ int main() {
             std::cout << "Reading small region data..." << std::endl;
             
             int regionInlineStart = volumeInfo.inlineStart;
-            int regionInlineEnd = std::min(volumeInfo.inlineStart + 1, volumeInfo.inlineEnd);
+            int regionInlineEnd = std::min(volumeInfo.inlineStart + 10, volumeInfo.inlineEnd);
             int regionCrosslineStart = volumeInfo.crosslineStart;
-            int regionCrosslineEnd = std::min(volumeInfo.crosslineStart + 1, volumeInfo.crosslineEnd);
+            int regionCrosslineEnd = std::min(volumeInfo.crosslineStart + 10, volumeInfo.crosslineEnd);
             
             std::vector<float> regionData;
             if (reader.readTraceRegion(regionInlineStart, regionInlineEnd,
