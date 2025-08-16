@@ -164,10 +164,12 @@ public:
     
     bool printTextualHeader(std::string filename);
 
-    bool GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals);
+    bool GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);
 
-    bool GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals);
+    bool GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);
     
-    bool GetDataAxis(float& min_val, float& max_val, int& num_vals);
+    bool GetDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval);
+
+    std::string getErrMsg() const { return m_lastError; }
     
 };

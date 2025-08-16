@@ -1046,7 +1046,7 @@ bool SEGYReader::printTextualHeader(std::string filename) {
 }
 
 
-bool SEGYReader::GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals)
+bool SEGYReader::GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
 {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -1056,10 +1056,11 @@ bool SEGYReader::GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals)
     min_val = m_fileInfo.minInline;
     max_val = m_fileInfo.maxInline;
     num_vals = m_fileInfo.inlineCount;
+    step = m_fileInfo.primaryStep;
     return true;
 }
 
-bool SEGYReader::GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals)
+bool SEGYReader::GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
 {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -1068,11 +1069,13 @@ bool SEGYReader::GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals)
     min_val = m_fileInfo.minCrossline;
     max_val = m_fileInfo.maxCrossline;
     num_vals = m_fileInfo.crosslineCount;
+    step = m_fileInfo.secondaryStep;
+
     return true;    
 }
 
 
-bool SEGYReader::GetDataAxis(float& min_val, float& max_val, int& num_vals) 
+bool SEGYReader::GetDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval) 
 {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -1084,6 +1087,8 @@ bool SEGYReader::GetDataAxis(float& min_val, float& max_val, int& num_vals)
     max_val = m_fileInfo.sampleCount * m_fileInfo.sampleInterval / 1000.0f; // Convert microseconds to ms
 
     num_vals = m_fileInfo.sampleCount;
+
+    sinterval = m_fileInfo.sampleInterval;
 
     return true;
 }

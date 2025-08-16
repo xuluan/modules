@@ -20,7 +20,6 @@ struct Segyinput {
     int sinterval_offset;
     int trace_length_offset;
     int data_format_code_offset;
-    std::string trace_unit;
     int fpkey;
     int lpkey;
     int fskey;
@@ -28,13 +27,12 @@ struct Segyinput {
     int pkinc;
     int skinc;
     int trace_length;
+    int sinterval;
     float tmin;
     float tmax;
     int num_skey;
-    int current_pkey_index;
-    float* trace_buf;
-    std::vector<int> pkeys;
-    std::vector<int> skeys;
+    int num_pkey;
+    int current_pkey;
     void* logger;
 };
 

@@ -86,15 +86,55 @@ void segyinput_init(const char* myid, const char* buf)
             segy_reader.AddCustomField("numSamplesKey", my_data->trace_length_offset, 2);
             segy_reader.AddCustomField("sampleIntervalKey", my_data->sinterval_offset, 2);
             segy_reader.AddCustomField("dataSampleFormatCodeKey", my_data->data_format_code_offset, 2);
+
+    
+
             auto& attrs = config["testgendata"]["attribute"];
             if(attrs.is_array()) {
                 
             }
 
-            segy_reader.Initialize(my_data->data_url);
+            if(!segy_reader.Initialize(my_data->data_url)) {
+                throw std::runtime_error("Error: failed to initialize SEGY reader for file: " + my_data->data_url + ", Error msg: " + segy_reader.getErrMsg());
+            }
 
+            // get segy info
+            segy_reader.GetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
+            segy_reader.GetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
+            segy_reader.GetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
+
+            my_data->current_pkey = my_data->fpkey;
+
+            // Add primary and secondary attribute
+            job_df.AddAttribute(my_data->pkey_name.c_str(), as::DataFormat::FORMAT_U32, 1);
+            job_df.AddAttribute(my_data->skey_name.c_str(), as::DataFormat::FORMAT_U32, 1);
+
+            job_df.SetPrimaryKeyName(my_data->pkey_name.c_str());
+            job_df.SetSecondaryKeyName(my_data->skey_name.c_str());
+        
+            // Add trace attribute
+            job_df.AddAttribute(my_data->trace_name.c_str(), 
+                                as::DataFormat::FORMAT_R32, 
+                                my_data->trace_length);
+            job_df.SetVolumeDataName(my_data->trace_name.c_str());    
+            
+            job_df.SetDataAxisUnit("ms");
+            // set the group size, to allocate buffers
+            job_df.SetGroupSize(my_data->num_skey);
+
+            // Set up data axis
+            job_df.SetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length);
+
+            // Set up primary key axis
+            job_df.SetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey);
+
+            // set up secondary key axis
+            job_df.SetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey);
 
         }
+            
+        job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
+
     } catch (const std::exception& e) {
         gd_logger.LogError(my_logger, e.what());
         job_df.SetJobAborted();
@@ -106,35 +146,50 @@ void segyinput_init(const char* myid, const char* buf)
 
 void segyinput_process(const char* myid)
 {
-  auto& gd_logger = gdlog::GdLogger::GetInstance();
-  auto& job_df = df::GeoDataFlow::GetInstance();
+    auto& gd_logger = gdlog::GdLogger::GetInstance();
+    auto& job_df = df::GeoDataFlow::GetInstance();
 
-  Segyinput* my_data = static_cast<Segyinput*>(job_df.GetModuleStruct(myid));
-  void* my_logger = my_data->logger;
+    Segyinput* my_data = static_cast<Segyinput*>(job_df.GetModuleStruct(myid));
+    void* my_logger = my_data->logger;
 
-  // A handy function to clean up resources if errors happen, 
-  // or job has finished
-  auto _clean_up = [&] ()-> void {
-    if (my_data != nullptr) {
-      delete my_data;
+    // A handy function to clean up resources if errors happen, 
+    // or job has finished
+    auto _clean_up = [&] ()-> void {
+        if (my_data != nullptr) {
+        delete my_data;
+        }
+    };
+
+    if (job_df.JobFinished()) {
+        _clean_up();
+        return;
     }
-  };
 
-  if (job_df.JobFinished()) {
-    _clean_up();
-    return;
-  }
-  
-  // have we reached the end of data
-  if (my_data->current_pkey_index >= my_data->pkeys.size()) {
-    // set the flag
-    job_df.SetJobFinished();
-    return;
-  }
-  
+    if(my_data->is_dry_run) {
+        // set the flag
+        job_df.SetJobFinished();
+        return;
+    }
 
-  int grp_size = job_df.GetGroupSize();
+    // have we reached the end of data
+    if (my_data->pkinc > 0) {
+        if (my_data->current_pkey > my_data->lpkey) {
+        // set the flag
+        job_df.SetJobFinished();
+        return;
+        }
 
-  // prepare for the next call
-  my_data->current_pkey_index++;
+    }
+    else {
+        if (my_data->current_pkey < my_data->lpkey) {
+        // set the flag
+        job_df.SetJobFinished();
+        return;
+        }
+    }
+
+    int grp_size = job_df.GetGroupSize();
+
+    // prepare for the next call
+    my_data->current_pkey = my_data->current_pkey + my_data->pkinc;
 }
