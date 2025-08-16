@@ -1,117 +1,169 @@
-/****************************************************************************
-** SEGY to VDS Converter - SEGY Reader
-** 
-** This file implements SEGY file reading functionality using OpenVDS SEGYUtils
-****************************************************************************/
+#pragma once
 
-#ifndef SEGY_READER_H
-#define SEGY_READER_H
-
-#include <string>
+#include <iostream>
+#include <fstream>
 #include <vector>
-#include <memory>
+#include <string>
+#include <map>
+#include <cstring>
 #include <cstdint>
-#include <functional>
+#include <algorithm>
+#include <set>
+#include <iomanip>
+#include <cmath>
+#include <memory>
+#include <cassert>
+#include <climits>
 
-// OpenVDS SEGY utilities headers
-#include "SEGYUtils/SEGY.h"
+// OpenVDS SEGY structure definitions
+namespace SEGY {
+    enum { TextualFileHeaderSize = 3200, BinaryFileHeaderSize = 400, TraceHeaderSize = 240 };
+    
+    enum class Endianness { BigEndian, LittleEndian };
+    enum class FieldWidth { TwoByte, FourByte };
+    
+    struct HeaderField {
+        int byteLocation;
+        FieldWidth fieldWidth;
+        
+        HeaderField() : byteLocation(0), fieldWidth(FieldWidth::TwoByte) {}
+        HeaderField(int loc, FieldWidth width) : byteLocation(loc), fieldWidth(width) {}
+        bool Defined() const { return byteLocation != 0; }
+    };
+    
+    enum class DataSampleFormatCode {
+        Unknown = 0, 
+        IBMFloat = 1, 
+        Int32 = 2, 
+        Int16 = 3, 
+        FixedPoint = 4, 
+        IEEEFloat = 5, 
+        IEEEDouble = 6, 
+        Int24 = 7, 
+        Int8 = 8
+    };
+    
+    // Standard SEGY header field definitions
+    namespace BinaryHeader {
+        const HeaderField SampleIntervalHeaderField(17, FieldWidth::TwoByte);
+        const HeaderField NumSamplesHeaderField(21, FieldWidth::TwoByte);
+        const HeaderField DataSampleFormatCodeHeaderField(25, FieldWidth::TwoByte);
+    }
+    
+    namespace TraceHeader {
+        const HeaderField NumSamplesHeaderField(115, FieldWidth::TwoByte);
+        const HeaderField SampleIntervalHeaderField(117, FieldWidth::TwoByte);
+        const HeaderField InlineNumberHeaderField(189, FieldWidth::FourByte);
+        const HeaderField CrosslineNumberHeaderField(193, FieldWidth::FourByte);
+    }
+    
+    // OpenVDS-style ReadFieldFromHeader implementation
+    int ReadFieldFromHeader(const void *header, const HeaderField &headerField, Endianness endianness);
+}
 
-// Note: Using simplified approach without complex OpenVDS internal dependencies
-
-struct SEGYVolumeInfo {
-    // Volume dimensions
-    int inlineCount;
-    int crosslineCount; 
-    int sampleCount;
+// OpenVDS-style segment information structure
+struct SEGYSegmentInfo {
+    int primaryKey;
+    int64_t traceStart;
+    int64_t traceStop;
+    float score;
     
-    // Sample information
-    double sampleInterval;    // in milliseconds
-    double startTime;         // in milliseconds
+    SEGYSegmentInfo(int pk, int64_t start) 
+        : primaryKey(pk), traceStart(start), traceStop(start), score(0.0f) {}
     
-    // Coordinate information
-    int inlineStart, inlineEnd;
-    int crosslineStart, crosslineEnd;
-    double xMin, xMax, yMin, yMax;
-    
-    // Data format
-    SEGY::BinaryHeader::DataSampleFormatCode dataFormat;
-    SEGY::Endianness endianness;
-    
-    // Statistics
-    int64_t totalTraces;
-    
-    SEGYVolumeInfo() 
-        : inlineCount(0), crosslineCount(0), sampleCount(0)
-        , sampleInterval(0.0), startTime(0.0)
-        , inlineStart(0), inlineEnd(0), crosslineStart(0), crosslineEnd(0)
-        , xMin(0.0), xMax(0.0), yMin(0.0), yMax(0.0)
-        , dataFormat(SEGY::BinaryHeader::DataSampleFormatCode::Unknown)
-        , endianness(SEGY::Endianness::BigEndian)
-        , totalTraces(0) {}
+    int64_t TraceCount() const { return traceStop - traceStart + 1; }
 };
 
+// Simplified single-file OpenVDS-style file information structure
+struct SEGYFileInfo {
+    SEGY::Endianness headerEndianness;
+    SEGY::DataSampleFormatCode dataSampleFormatCode;
+    int sampleCount;
+    int sampleInterval;
+    int64_t totalTraces;
+    int traceByteSize;
+    
+    SEGY::HeaderField primaryKey;
+    SEGY::HeaderField secondaryKey;
+    
+    std::vector<SEGYSegmentInfo> segments; // Single file segments only
+    
+    // Coordinate range information for trace index calculation
+    int minInline, maxInline, inlineCount;
+    int minCrossline, maxCrossline, crosslineCount;
+    int primaryStep, secondaryStep;
+    bool isPrimaryInline; // true if primary key is inline, false if crossline
+    
+    int TraceByteSize() const { return traceByteSize; }
+};
+
+// Single-file SEGY analyzer based on true OpenVDS algorithms
 class SEGYReader {
+private:
+    std::string m_filename;
+    std::string m_lastError;
+    // Internal state
+    bool m_initialized;
+        
+    SEGYFileInfo m_fileInfo;
+    std::map<std::string, SEGY::HeaderField> m_customFields;
+    std::map<std::string, std::string> m_fieldAliases;
+    
+    // Smart endianness detection
+    SEGY::Endianness DetectEndianness(const char* binaryHeader, const char* firstTraceHeader);
+    
+    // True OpenVDS segment building algorithm for single file
+    void BuildSegmentInfo(std::ifstream& file);
+    
+    // True OpenVDS representative segment finding for single file
+    SEGYSegmentInfo findRepresentativeSegment(int& primaryStep);
+    
+    // OpenVDS secondary key analysis - Precise port of SEGYImport.cpp:1247+
+    bool analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segmentInfo, int& secondaryStep, int& fold);
+    
+    // Calculate coordinate ranges based on segments for trace index conversion
+    void CalculateCoordinateRanges();
+    
+    // OpenVDS-style coordinate to sample index conversion
+    int CoordinateToSampleIndex(int coordinate, int coordinateMin, int coordinateMax, int numSamples) const;
+    
+    // Fast rectangular grid calculation for regular SEGY data
+    int64_t calculateRectangularTraceIndex(int inlineNum, int crosslineNum);
+    
+    // Verify if calculated index matches actual coordinates in SEGY file
+    bool verifyTraceCoordinates(int64_t traceIndex, int expectedInline, int expectedCrossline);
+    
+    // Find trace number from inline/crossline coordinates using OpenVDS algorithm
+    int64_t findTraceNumber(int inlineNum, int crosslineNum);
+
+    char ebcdicToAscii(unsigned char ebcdicChar);
+
 public:
     SEGYReader();
-    ~SEGYReader();
     
-    // Initialize and scan SEGY file
-    bool initialize(const std::string& segyFilePath);
+    void AddCustomField(const std::string& name, int byteLocation, int width);
     
-    // Get volume information after initialization
-    const SEGYVolumeInfo& getVolumeInfo() const { return m_volumeInfo; }
+    bool Initialize(const std::string& filename);
+    
+    void PrintFileInfo();
+    
+    // Get trace number with rectangular assumption and fallback to precise search
+    int64_t getTraceNumber(int inlineNum, int crosslineNum);
 
-/*
-    // Get extracted metadata
-    const SEGYMetadata& getMetadata() const { return m_metadata; }
-    
-    // Get format compatibility information
-    const SEGYFormatInfo& getFormatInfo() const { return m_formatInfo; }
-*/    
-
-    
     // Read trace data for a specific inline/crossline
     bool readTrace(int inline_num, int crossline_num, std::vector<float>& traceData);
     
     // Read multiple traces in a region
     bool readTraceRegion(int inlineStart, int inlineEnd, 
                         int crosslineStart, int crosslineEnd,
-                        std::vector<float>& volumeData);
+                        std::vector<float>& volumeData); 
     
-    // Error handling
-    const std::string& getLastError() const { return m_lastError; }
-    
-private:
-    // Private implementation details
-    bool scanSEGYFile();
-    bool validateSEGYFile();
-    void calculateVolumeInfo();
-    bool setupDataProvider();
-    bool setupTraceManagement();
-    bool extractRealCoordinateBounds();
-    int64_t getTraceNumberFromCoordinates(int inlineNum, int crosslineNum);
-    
-    // Member variables
-    std::string m_segyFilePath;
-    
-    SEGYVolumeInfo m_volumeInfo;
-    std::string m_lastError;
-/*
-    SEGYMetadata m_metadata;
-    SEGYFormatInfo m_formatInfo;
-*/
+    bool printTextualHeader(std::string filename);
 
+    bool GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals);
+
+    bool GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals);
     
-    // Internal state
-    bool m_initialized;
-    std::vector<std::string> m_inputFiles;
+    bool GetDataAxis(float& min_val, float& max_val, int& num_vals);
     
-    // Note: Using direct file I/O approach since OpenVDS binary distribution
-    // doesn't include complete SEGYUtils headers
-    
-    // Additional members for trace management
-    int64_t m_traceByteSize;
-    int64_t m_tracesPerPage;
 };
-
-#endif // SEGY_READER_H
