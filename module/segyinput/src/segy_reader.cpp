@@ -1079,9 +1079,7 @@ bool SEGYReader::readTraceRegion(int inlineStart, int inlineEnd,
                 // Copy trace data to volume array
                 std::memcpy(&volumeData[idx], traceData.data(), m_fileInfo.sampleCount * sizeof(float));
                 idx += m_fileInfo.sampleCount;
-
                 tracesRead++;
-
             }
         }
         
@@ -1126,7 +1124,7 @@ bool SEGYReader::readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,
     try {
         char *volumeData = static_cast<char*>(data);
         
-        std::cout << "Reading region: Primary index: " << priIndex 
+        std::cout << "Reading trace at primary index: " << priIndex 
                   << ", Crossline: " << sndStart << "-" << sndEnd << std::endl;
         
         // Read traces in the region
@@ -1137,17 +1135,21 @@ bool SEGYReader::readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,
         int step = m_fileInfo.secondaryStep;
         int trace_length = (dataEnd - dataStart + 1) * sampleCodeSize;
         int idx = 0;
+        int start = (sndStart - m_fileInfo.minCrossline) / step * step + m_fileInfo.minCrossline;
+        int end = (sndEnd - m_fileInfo.minCrossline) / step * step + m_fileInfo.minCrossline;
 
 
-        for (int xl = sndStart; xl <= sndEnd; xl+=step) {
+        for (int xl = start; xl <= end; xl+=step) {
             //get trace number
 
             int64_t traceNum = getTraceNumber(file, priIndex, xl);
 
             if (traceNum < 0) {
-                m_lastError = "Invalid trace coordinates";
-                file.close();
-                return false;
+                //skip
+                std::cerr << "Warning: Trace number not found for Primary index: " << priIndex << ", Crossline: " << xl << std::endl;
+                std::memset(&volumeData[idx], 0, trace_length);
+                idx +=trace_length; 
+                continue;               
             }
 
             // Read trace data
@@ -1155,20 +1157,17 @@ bool SEGYReader::readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,
                 file.close();
                 return false;
             }
-            char *data = static_cast<char*>(traceData.data());
-
             // Copy trace data to volume array
-            std::memcpy(&volumeData[idx], &data[dataStart*sampleCodeSize], trace_length);
-
+            std::memcpy(&volumeData[idx], &traceData.data()[dataStart*sampleCodeSize], trace_length);
             idx +=trace_length;
         }
 
-        std::cout << "Successfully read Primary index: " << priIndex << std::endl;
+        std::cout << "Successfully read data at primary index: " << priIndex << std::endl;
         file.close();
         return true;
         
     } catch (const std::exception& e) {
-        m_lastError = std::string("Error reading trace region: ") + e.what();
+        m_lastError = std::string("Error reading trace: ") + e.what();
         file.close();
         return false;
     }
@@ -1178,8 +1177,96 @@ bool SEGYReader::readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,
 // Read multiple attributes by primary index
 bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, int sndEnd, void* data)
 {
+    if (!m_initialized) {
+        m_lastError = "SEGY reader not initialized";
+        return false;
+    }
 
-    return true;
+    // Validate region bounds
+    if (priIndex < m_fileInfo.minInline || priIndex > m_fileInfo.maxInline ||
+        sndStart < m_fileInfo.minCrossline || sndEnd > m_fileInfo.maxCrossline ||
+        sndStart > sndEnd) {
+        m_lastError = "Invalid region bounds";
+        return false;
+    }
+
+    if(!data) {
+        m_lastError = "Invalid data point";
+        return false;        
+    }
+
+    if(m_attrFields.find(attr) == m_customFields.end()) {
+        m_lastError = "Attribut " + attr + " doesn't exist.";
+        return false;         
+    }
+
+    SEGY::HeaderField attrField = m_attrFields[attr];    
+
+    std::ifstream file(m_filename, std::ios::binary);
+    if (!file) {
+        m_lastError = "Error: Cannot open file for trace: " + m_filename ;
+        return false;
+    }
+
+    try {
+        char *attrData = static_cast<char*>(data);
+        
+        std::cout << "Reading attribute data:" << attr << " Primary index: " << priIndex 
+                  << ", Crossline: " << sndStart << "-" << sndEnd << std::endl;
+        
+        // Resize trace data vector
+        int size = attrField.fieldWidth;
+        int step = m_fileInfo.secondaryStep;
+        int idx = 0;
+        int start = (sndStart - m_fileInfo.minCrossline) / step * step + m_fileInfo.minCrossline;
+        int end = (sndEnd - m_fileInfo.minCrossline) / step * step + m_fileInfo.minCrossline;
+
+        for (int xl = start; xl <= end; xl+=step) {
+            //get trace number
+            int64_t traceNum = getTraceNumber(file, priIndex, xl);
+
+            if (traceNum < 0) {
+                //skip
+                std::cerr << "Warning: Trace number not found for Primary index: " << priIndex << ", Crossline: " << xl << std::endl;
+                std::memset(&attrData[idx], 0, size);
+                idx += size; 
+                continue;    
+            }
+
+            // Read trace header
+            // Calculate file position for this trace
+            // SEGY format: 3200 byte textual header + 400 byte binary header + traces
+            int64_t traceStartOffset = 3600 + traceNum * m_fileInfo.traceByteSize;
+            
+            file.seekg(traceStartOffset);
+            if (!file.good()) {
+                m_lastError = "Failed to seek to trace position";
+                file.close();
+                return false;
+            }
+            
+            // Read trace header first (240 bytes) - we need to verify inline/crossline
+            char traceHeader[240];
+            file.read(traceHeader, 240);
+            if (file.gcount() != 240) {
+                m_lastError = "Failed to read trace header";
+                file.close();
+                return false;
+            }
+
+            ReadFieldFromHeader(traceHeader, &attrData[idx], attrField, m_fileInfo.headerEndianness);
+            idx += size;
+        }
+
+        std::cout << "Successfully read attribute at primary index: " << priIndex << std::endl;
+        file.close();
+        return true;
+        
+    } catch (const std::exception& e) {
+        m_lastError = std::string("Error reading attribute: ") + e.what();
+        file.close();
+        return false;
+    }
 }
 
 
