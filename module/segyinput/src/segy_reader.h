@@ -22,15 +22,6 @@ namespace SEGY {
     enum class Endianness { BigEndian, LittleEndian };
     enum class FieldWidth { TwoByte, FourByte };
     
-    struct HeaderField {
-        int byteLocation;
-        FieldWidth fieldWidth;
-        
-        HeaderField() : byteLocation(0), fieldWidth(FieldWidth::TwoByte) {}
-        HeaderField(int loc, FieldWidth width) : byteLocation(loc), fieldWidth(width) {}
-        bool Defined() const { return byteLocation != 0; }
-    };
-    
     enum class DataSampleFormatCode {
         Unknown = 0, 
         IBMFloat = 1, 
@@ -41,6 +32,15 @@ namespace SEGY {
         IEEEDouble = 6, 
         Int24 = 7, 
         Int8 = 8
+    };
+
+    struct HeaderField {
+        int byteLocation;
+        FieldWidth fieldWidth;
+        
+        HeaderField() : byteLocation(0), fieldWidth(FieldWidth::TwoByte) {}
+        HeaderField(int loc, FieldWidth width) : byteLocation(loc), fieldWidth(width) {}
+        bool Defined() const { return byteLocation != 0; }
     };
     
     // Standard SEGY header field definitions

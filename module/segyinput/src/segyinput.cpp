@@ -58,12 +58,12 @@ void segyinput_init(const char* myid, const char* buf)
       
         gd_logger.LogInfo(my_logger, "segyinput run_mode: {}", run_mode);
             
-        SEGYReader segy_reader;
+        
 
         if (run_mode == "dry-run") {
             my_data->is_dry_run = true;
 
-            if (!segy_reader.printTextualHeader(my_data->data_url)) {
+            if (!my_data->segy_reader.printTextualHeader(my_data->data_url)) {
                 throw std::runtime_error("Error: failed to print textual header from segy file: " + my_data->data_url);
             }
 
@@ -81,27 +81,21 @@ void segyinput_init(const char* myid, const char* buf)
             my_data->sinterval_offset = segyin_config.at("sinterval_offset", "segyinput").as_int();
             my_data->trace_length_offset = segyin_config.at("trace_length_offset", "segyinput").as_int();
             my_data->data_format_code_offset = segyin_config.at("data_format_code_offset", "segyinput").as_int();
-            segy_reader.AddCustomField("inlinenumber", my_data->primary_offset, 4);
-            segy_reader.AddCustomField("crosslinenumber", my_data->secondary_offset, 4);
-            segy_reader.AddCustomField("numSamplesKey", my_data->trace_length_offset, 2);
-            segy_reader.AddCustomField("sampleIntervalKey", my_data->sinterval_offset, 2);
-            segy_reader.AddCustomField("dataSampleFormatCodeKey", my_data->data_format_code_offset, 2);
+            my_data->segy_reader.AddCustomField("inlinenumber", my_data->primary_offset, 4);
+            my_data->segy_reader.AddCustomField("crosslinenumber", my_data->secondary_offset, 4);
+            my_data->segy_reader.AddCustomField("numSamplesKey", my_data->trace_length_offset, 2);
+            my_data->segy_reader.AddCustomField("sampleIntervalKey", my_data->sinterval_offset, 2);
+            my_data->segy_reader.AddCustomField("dataSampleFormatCodeKey", my_data->data_format_code_offset, 2);
 
-    
 
-            auto& attrs = config["testgendata"]["attribute"];
-            if(attrs.is_array()) {
-                
-            }
-
-            if(!segy_reader.Initialize(my_data->data_url)) {
-                throw std::runtime_error("Error: failed to initialize SEGY reader for file: " + my_data->data_url + ", Error msg: " + segy_reader.getErrMsg());
+            if(!my_data->segy_reader.Initialize(my_data->data_url)) {
+                throw std::runtime_error("Error: failed to initialize SEGY reader for file: " + my_data->data_url + ", Error msg: " + my_data->segy_reader.getErrMsg());
             }
 
             // get segy info
-            segy_reader.GetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
-            segy_reader.GetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
-            segy_reader.GetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
+            my_data->segy_reader.GetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
+            my_data->segy_reader.GetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
+            my_data->segy_reader.GetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
 
             my_data->current_pkey = my_data->fpkey;
 
@@ -130,6 +124,20 @@ void segyinput_init(const char* myid, const char* buf)
 
             // set up secondary key axis
             job_df.SetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey);
+
+            // add sttributes
+            auto& attrs = config["testgendata"]["attribute"];
+            if(attrs.is_array()) {
+                //parse attributes
+                auto& arr = config["testgendata"]["attribute"].as_array();
+                for (size_t i = 0; i < arr.size(); ++i) {
+                    auto& attr = arr[i];
+                    std::string name = attr.at("name", "attribute").as_string();
+                    std::string datatype = attr.at("datatype", "attribute").as_string();
+                    int offset = attr.at("offset", "attribute").as_int();
+                }
+                
+            }            
 
         }
             

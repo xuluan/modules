@@ -11,6 +11,7 @@
 struct Segyinput {
     std::string data_url;
     bool is_dry_run;
+    SEGYReader segy_reader;
 
     std::string pkey_name;
     std::string skey_name;
