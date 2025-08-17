@@ -1,5 +1,6 @@
-#include "segy_reader.h"
 #include <arpa/inet.h>  // For ntohl, ntohs (network byte order conversion)
+#include <GdLogger.h>
+#include "segy_reader.h"
 
 //#define DEBUG_EN 1
 
@@ -46,12 +47,13 @@ namespace SEGY {
     }
 }
 
-SEGYReader::SEGYReader() : m_initialized(false) {
+SEGYReader::SEGYReader() : m_initialized(false), m_log_data(NULL){
     // Initialize field aliases
     m_fieldAliases["inline"] = "inlinenumber";
     m_fieldAliases["crossline"] = "crosslinenumber"; 
     m_fieldAliases["iline"] = "inlinenumber";
     m_fieldAliases["xline"] = "crosslinenumber";
+    m_logger = &gdlog::GdLogger::GetInstance();
 }
 
 void SEGYReader::AddCustomField(const std::string& name, int byteLocation, int width) {
@@ -1304,7 +1306,7 @@ char SEGYReader::ebcdicToAscii(unsigned char ebcdicChar) {
 bool SEGYReader::printTextualHeader(std::string filename) {
     try {
         std::cout << "Reading SEGY Textual Header (3200 bytes)..." << std::endl;
-
+        m_logger->LogInfo(m_log_data, "Reading SEGY Textual Header (3200 bytes) from file: {}" , filename);
         std::ifstream file(filename, std::ios::binary);
         if (!file.is_open()) {
             std::cout << "Error: Cannot open SEGY file: " << filename << std::endl;

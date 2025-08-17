@@ -24,6 +24,8 @@ void segyinput_init(const char* myid, const char* buf)
 
     my_data->logger = my_logger;
 
+    my_data->segy_reader.setLogData(my_logger);
+
     auto& job_df = df::GeoDataFlow::GetInstance();
 
     // A handy function to clean up resources if errors happen
@@ -156,6 +158,8 @@ void segyinput_init(const char* myid, const char* buf)
                 for (size_t i = 0; i < arr.size(); ++i) {
                     auto& attr = arr[i];
                     std::string name = attr.at("name", "attribute").as_string();
+                    gutl::UTL_StringToUpperCase(name);
+
                     std::string datatype = attr.at("datatype", "attribute").as_string();
                     int offset = attr.at("offset", "attribute").as_int();
                     SEGY::DataSampleFormatCode format;

@@ -114,6 +114,9 @@ private:
     std::map<std::string, SEGY::HeaderField> m_customFields;
     std::map<std::string, std::string> m_fieldAliases;
     std::map<std::string, SEGY::HeaderField> m_attrFields;
+
+    gdlog::GdLogger* m_logger;
+    void * m_log_data;
     
     // Smart endianness detection
     SEGY::Endianness DetectEndianness(const char* binaryHeader, const char* firstTraceHeader);
@@ -147,6 +150,8 @@ private:
     int getSampleCodeSize();
 public:
     SEGYReader();
+
+    void setLogData(void *logData) { m_log_data = logData; }
     
     void AddCustomField(const std::string& name, int byteLocation, int width);
 
