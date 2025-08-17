@@ -83,21 +83,21 @@ void segyinput_init(const char* myid, const char* buf)
             my_data->sinterval_offset = segyin_config.at("sinterval_offset", "segyinput").as_int();
             my_data->trace_length_offset = segyin_config.at("trace_length_offset", "segyinput").as_int();
             my_data->data_format_code_offset = segyin_config.at("data_format_code_offset", "segyinput").as_int();
-            my_data->segy_reader.AddCustomField("inlinenumber", my_data->primary_offset, 4);
-            my_data->segy_reader.AddCustomField("crosslinenumber", my_data->secondary_offset, 4);
-            my_data->segy_reader.AddCustomField("numSamplesKey", my_data->trace_length_offset, 2);
-            my_data->segy_reader.AddCustomField("sampleIntervalKey", my_data->sinterval_offset, 2);
-            my_data->segy_reader.AddCustomField("dataSampleFormatCodeKey", my_data->data_format_code_offset, 2);
+            my_data->segy_reader.addCustomField("inlinenumber", my_data->primary_offset, 4);
+            my_data->segy_reader.addCustomField("crosslinenumber", my_data->secondary_offset, 4);
+            my_data->segy_reader.addCustomField("numSamplesKey", my_data->trace_length_offset, 2);
+            my_data->segy_reader.addCustomField("sampleIntervalKey", my_data->sinterval_offset, 2);
+            my_data->segy_reader.addCustomField("dataSampleFormatCodeKey", my_data->data_format_code_offset, 2);
 
 
-            if(!my_data->segy_reader.Initialize(my_data->data_url)) {
+            if(!my_data->segy_reader.initialize(my_data->data_url)) {
                 throw std::runtime_error("Error: failed to initialize SEGY reader for file: " + my_data->data_url + ", Error msg: " + my_data->segy_reader.getErrMsg());
             }
 
             // get segy info
-            my_data->segy_reader.GetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
-            my_data->segy_reader.GetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
-            my_data->segy_reader.GetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
+            my_data->segy_reader.getPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
+            my_data->segy_reader.getSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
+            my_data->segy_reader.getDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
 
             my_data->current_pkey = my_data->fpkey;
 
@@ -180,7 +180,7 @@ void segyinput_init(const char* myid, const char* buf)
                     } else {
                         throw std::runtime_error("Error: segyinput the datatype of attribute " + name + " is invalid: " + datatype);
                     }
-                    my_data->segy_reader.AddAttrField(name, offset, 4, format);
+                    my_data->segy_reader.addAttrField(name, offset, 4, format);
                     job_df.AddAttribute(name.c_str(), type, 1);
                     job_df.SetAttributeUnit(name.c_str(), "");
                 }

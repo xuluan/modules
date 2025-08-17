@@ -6,8 +6,8 @@
 
 namespace SEGY {
     // OpenVDS-style ReadFieldFromHeader implementation
-    void ReadFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness) {
-        if (!headerField.Defined()) {
+    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness) {
+        if (!headerField.defined()) {
             return;
         }
         
@@ -40,9 +40,9 @@ namespace SEGY {
     }
     
     // Helper function for backward compatibility
-    int ReadFieldFromHeaderInt(const void *header, const HeaderField &headerField, Endianness endianness) {
+    int readFieldFromHeaderInt(const void *header, const HeaderField &headerField, Endianness endianness) {
         int result = 0;
-        ReadFieldFromHeader(header, &result, headerField, endianness);
+        readFieldFromHeader(header, &result, headerField, endianness);
         return result;
     }
 }
@@ -56,7 +56,7 @@ SEGYReader::SEGYReader() : m_initialized(false), m_log_data(NULL){
     m_logger = &gdlog::GdLogger::GetInstance();
 }
 
-void SEGYReader::AddCustomField(const std::string& name, int byteLocation, int width) {
+void SEGYReader::addCustomField(const std::string& name, int byteLocation, int width) {
     std::string canonicalName = name;
     if (m_fieldAliases.find(name) != m_fieldAliases.end()) {
         canonicalName = m_fieldAliases[name];
@@ -79,7 +79,7 @@ void SEGYReader::AddCustomField(const std::string& name, int byteLocation, int w
     std::cout << "Added custom field: " << canonicalName << " at byte " << byteLocation << " (width: " << width << ")" << std::endl;
 }
 
-void SEGYReader::AddAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
+void SEGYReader::addAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
     std::string canonicalName = name;
     if (m_fieldAliases.find(name) != m_fieldAliases.end()) {
         canonicalName = m_fieldAliases[name];
@@ -93,13 +93,13 @@ void SEGYReader::AddAttrField(const std::string& name, int byteLocation, int wid
     std::cout << "Added custom field: " << canonicalName << " at byte " << byteLocation << " (width: " << width << ")" << std::endl;
 }
 
-SEGY::Endianness SEGYReader::DetectEndianness(const char* binaryHeader, const char* firstTraceHeader) {
-    int intervalBE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
-    int intervalLE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
-    int samplesBE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
-    int samplesLE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
-    int formatBE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
-    int formatLE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
+SEGY::Endianness SEGYReader::detectEndianness(const char* binaryHeader, const char* firstTraceHeader) {
+    int intervalBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
+    int intervalLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
+    int samplesBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
+    int samplesLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
+    int formatBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
+    int formatLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
     
     std::cout << "Endianness detection:" << std::endl;
     std::cout << "  Binary Header - BE: interval=" << intervalBE_bin << ", samples=" << samplesBE_bin << ", format=" << formatBE_bin << std::endl;
@@ -125,7 +125,7 @@ SEGY::Endianness SEGYReader::DetectEndianness(const char* binaryHeader, const ch
     return SEGY::Endianness::BigEndian;
 }
 
-void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
+void SEGYReader::buildSegmentInfo(std::ifstream& file) {
     
     std::cout << "=== Building Segment Information (Single File OpenVDS Algorithm) ===" << std::endl;
     
@@ -139,7 +139,7 @@ void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
     file.read(traceHeader.data(), SEGY::TraceHeaderSize);
     if (file.gcount() != SEGY::TraceHeaderSize) return;
     
-    int currentPrimaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+    int currentPrimaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
     SEGYSegmentInfo currentSegment(currentPrimaryKey, 0);
     
     std::cout << "Starting first segment with PrimaryKey: " << currentPrimaryKey << std::endl;
@@ -151,7 +151,7 @@ void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
         
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
-        int primaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+        int primaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
         
         if (primaryKey == currentSegment.primaryKey) {
             // **OpenVDS logic: Extend current segment**
@@ -162,7 +162,7 @@ void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
 #ifdef DEBUG_EN             
             std::cout << "Completed segment: PrimaryKey=" << currentSegment.primaryKey 
                       << ", Traces=[" << currentSegment.traceStart << "-" << currentSegment.traceStop << "]"
-                      << ", Count=" << currentSegment.TraceCount() << std::endl;
+                      << ", Count=" << currentSegment.traceCount() << std::endl;
 #endif            
             // Start new segment
             currentSegment = SEGYSegmentInfo(primaryKey, trace);
@@ -179,14 +179,14 @@ void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
     m_fileInfo.segments.push_back(currentSegment);
     std::cout << "Final segment: PrimaryKey=" << currentSegment.primaryKey 
               << ", Traces=[" << currentSegment.traceStart << "-" << currentSegment.traceStop << "]"
-              << ", Count=" << currentSegment.TraceCount() << std::endl;
+              << ", Count=" << currentSegment.traceCount() << std::endl;
     
     std::cout << "Total segments created: " << m_fileInfo.segments.size() << std::endl;
     
     // Verify segment integrity
     int64_t totalTracesInSegments = 0;
     for (const auto& seg : m_fileInfo.segments) {
-        totalTracesInSegments += seg.TraceCount();
+        totalTracesInSegments += seg.traceCount();
     }
     std::cout << "Verification: Total traces in segments = " << totalTracesInSegments 
               << ", Expected = " << m_fileInfo.totalTraces << std::endl;
@@ -216,7 +216,7 @@ SEGYSegmentInfo SEGYReader::findRepresentativeSegment(int& primaryStep) {
     
     // **OpenVDS core algorithm: Iterate through all segments**
     for (size_t i = 0; i < m_fileInfo.segments.size(); i++) {
-        int64_t numTraces = m_fileInfo.segments[i].TraceCount();
+        int64_t numTraces = m_fileInfo.segments[i].traceCount();
         
         // **Precise OpenVDS weight formula**
         float multiplier = 1.5f - std::abs(static_cast<float>(i) - static_cast<float>(totalSegments) / 2.0f) / static_cast<float>(totalSegments);
@@ -267,7 +267,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
     std::cout << "\n=== OpenVDS Secondary Key Analysis (Single File) ===" << std::endl;
     std::cout << "Analyzing segment - PrimaryKey: " << segmentInfo.primaryKey 
               << ", Traces: " << segmentInfo.traceStart << "-" << segmentInfo.traceStop 
-              << " (Count: " << segmentInfo.TraceCount() << ")" << std::endl;
+              << " (Count: " << segmentInfo.traceCount() << ")" << std::endl;
     
     secondaryStep = 0;
     fold = 1;
@@ -277,7 +277,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
     std::map<int, int> secondaryKeyCount;
     
     int tracesAnalyzed = 0;
-    int maxAnalyzeTraces = std::min(static_cast<int64_t>(2000), segmentInfo.TraceCount());
+    int maxAnalyzeTraces = std::min(static_cast<int64_t>(2000), segmentInfo.traceCount());
     
     std::cout << "Will analyze " << maxAnalyzeTraces << " traces from this segment" << std::endl;
     
@@ -289,7 +289,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
         // **OpenVDS validation: Ensure trace belongs to correct segment**
-        int tracePrimaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+        int tracePrimaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
         if (tracePrimaryKey != segmentInfo.primaryKey) {
             std::cout << "Warning: trace " << trace << " has mismatched primary key " 
                       << tracePrimaryKey << " vs expected " << segmentInfo.primaryKey << std::endl;
@@ -297,7 +297,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
         }
         
         // Read secondary key
-        int traceSecondaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.secondaryKey, m_fileInfo.headerEndianness);
+        int traceSecondaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.secondaryKey, m_fileInfo.headerEndianness);
         
         // **Precise OpenVDS gather analysis logic**
         if (gatherFold > 0 && traceSecondaryKey == gatherSecondaryKey) {
@@ -353,7 +353,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
     return true;
 }
 
-void SEGYReader::CalculateCoordinateRanges() {
+void SEGYReader::calculateCoordinateRanges() {
     if (m_fileInfo.segments.empty()) return;
     
     std::cout << "\n=== Calculating Coordinate Ranges for Trace Index Conversion ===" << std::endl;
@@ -384,10 +384,10 @@ void SEGYReader::CalculateCoordinateRanges() {
             
             if (file.gcount() != SEGY::TraceHeaderSize) break;
             
-            int inlineNum = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
+            int inlineNum = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
                 (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
                 m_fileInfo.headerEndianness);
-            int crosslineNum = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
+            int crosslineNum = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
                 (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
                 m_fileInfo.headerEndianness);
             
@@ -413,7 +413,7 @@ void SEGYReader::CalculateCoordinateRanges() {
     std::cout << "  Sampled " << sampledTraces << " traces for range calculation" << std::endl;
 }
 
-int SEGYReader::CoordinateToSampleIndex(int coordinate, int coordinateMin, int coordinateMax, int numSamples) const {
+int SEGYReader::coordinateToSampleIndex(int coordinate, int coordinateMin, int coordinateMax, int numSamples) const {
     if (coordinate == coordinateMin) return 0;
     if (numSamples <= 1) return 0;
     
@@ -459,10 +459,10 @@ bool SEGYReader::verifyTraceCoordinates(std::ifstream& file, int64_t traceIndex,
     
     if (file.gcount() != SEGY::TraceHeaderSize) return false;
     
-    int actualInline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
+    int actualInline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
         (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
         m_fileInfo.headerEndianness);
-    int actualCrossline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
+    int actualCrossline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
         (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
         m_fileInfo.headerEndianness);
         
@@ -521,8 +521,8 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
     }
     
     // Step 1: Convert coordinates to indices using OpenVDS algorithm
-    int inlineIndex = CoordinateToSampleIndex(inlineNum, m_fileInfo.minInline, m_fileInfo.maxInline, m_fileInfo.inlineCount);
-    int crosslineIndex = CoordinateToSampleIndex(crosslineNum, m_fileInfo.minCrossline, m_fileInfo.maxCrossline, m_fileInfo.crosslineCount);
+    int inlineIndex = coordinateToSampleIndex(inlineNum, m_fileInfo.minInline, m_fileInfo.maxInline, m_fileInfo.inlineCount);
+    int crosslineIndex = coordinateToSampleIndex(crosslineNum, m_fileInfo.minCrossline, m_fileInfo.maxCrossline, m_fileInfo.crosslineCount);
     
     std::cout << "Coordinate to index conversion:" << std::endl;
     std::cout << "  Inline " << inlineNum << " -> index " << inlineIndex << std::endl;
@@ -565,7 +565,7 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
     std::cout << "Found target segment:" << std::endl;
     std::cout << "  Primary key: " << targetSegment->primaryKey << std::endl;
     std::cout << "  Trace range: [" << targetSegment->traceStart << " - " << targetSegment->traceStop << "]" << std::endl;
-    std::cout << "  Trace count: " << targetSegment->TraceCount() << std::endl;
+    std::cout << "  Trace count: " << targetSegment->traceCount() << std::endl;
     
     std::vector<char> traceHeader(SEGY::TraceHeaderSize);
     
@@ -575,10 +575,10 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
         
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
-        int traceInline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
+        int traceInline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
             (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
             m_fileInfo.headerEndianness);
-        int traceCrossline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
+        int traceCrossline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
             (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
             m_fileInfo.headerEndianness);
         
@@ -592,7 +592,7 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
     std::cout << "Warning: Exact coordinate match not found in segment" << std::endl;
     
     // Step 5: Fallback - calculate estimated position within segment
-    int64_t estimatedOffset = static_cast<int64_t>(secondaryIndex * (targetSegment->TraceCount() / static_cast<float>(m_fileInfo.isPrimaryInline ? m_fileInfo.crosslineCount : m_fileInfo.inlineCount)));
+    int64_t estimatedOffset = static_cast<int64_t>(secondaryIndex * (targetSegment->traceCount() / static_cast<float>(m_fileInfo.isPrimaryInline ? m_fileInfo.crosslineCount : m_fileInfo.inlineCount)));
     int64_t estimatedTrace = targetSegment->traceStart + estimatedOffset;
     
     if (estimatedTrace > targetSegment->traceStop) {
@@ -603,7 +603,7 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
     return estimatedTrace;
 }
 
-bool SEGYReader::Initialize(const std::string& m_filename) {
+bool SEGYReader::initialize(const std::string& m_filename) {
     this->m_filename = m_filename;
     
     std::ifstream file(m_filename, std::ios::binary);
@@ -645,12 +645,12 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
     }
     
     // Detect endianness
-    m_fileInfo.headerEndianness = DetectEndianness(binaryHeader.data(), firstTraceHeader.data());
+    m_fileInfo.headerEndianness = detectEndianness(binaryHeader.data(), firstTraceHeader.data());
     
     // Read file parameters
-    int interval = SEGY::ReadFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
-    int samples = SEGY::ReadFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
-    int format = SEGY::ReadFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
+    int interval = SEGY::readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
+    int samples = SEGY::readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
+    int format = SEGY::readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
 
     // If binary header invalid, read from trace header
     if (interval <= 0 || samples <= 0) {
@@ -658,10 +658,10 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
         return false;
         /*
         if (interval <= 0) {
-            interval = SEGY::ReadFieldFromHeaderInt(firstTraceHeader.data(), SEGY::TraceHeader::SampleIntervalHeaderField, m_fileInfo.headerEndianness);
+            interval = SEGY::readFieldFromHeaderInt(firstTraceHeader.data(), SEGY::TraceHeader::SampleIntervalHeaderField, m_fileInfo.headerEndianness);
         }
         if (samples <= 0) {
-            samples = SEGY::ReadFieldFromHeaderInt(firstTraceHeader.data(), SEGY::TraceHeader::NumSamplesHeaderField, m_fileInfo.headerEndianness);
+            samples = SEGY::readFieldFromHeaderInt(firstTraceHeader.data(), SEGY::TraceHeader::NumSamplesHeaderField, m_fileInfo.headerEndianness);
         }
         */
     }
@@ -684,10 +684,10 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
     m_fileInfo.totalTraces = dataSize / m_fileInfo.traceByteSize;
     
     // **Use true OpenVDS segment building algorithm**
-    BuildSegmentInfo(file);
+    buildSegmentInfo(file);
     
     // Calculate coordinate ranges for trace index conversion
-    CalculateCoordinateRanges();
+    calculateCoordinateRanges();
     
     //CalculateStepsWithOpenVDSMethod 
     std::cout << "\n=== OpenVDS Single File Step Calculation ===" << std::endl;
@@ -721,7 +721,7 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
     return true;
 }
 
-void SEGYReader::PrintFileInfo() {
+void SEGYReader::printFileInfo() {
     std::cout << "\n=== OpenVDS Single File SEGY Analysis ===" << std::endl;
     std::cout << "File: " << m_filename << std::endl;
     std::cout << "Header Endianness: " << (m_fileInfo.headerEndianness == SEGY::Endianness::BigEndian ? "Big Endian" : "Little Endian") << std::endl;
@@ -735,12 +735,12 @@ void SEGYReader::PrintFileInfo() {
         std::cout << "Total Segments: " << m_fileInfo.segments.size() << std::endl;
         
         // Calculate segment statistics
-        int64_t minTraces = m_fileInfo.segments[0].TraceCount();
-        int64_t maxTraces = m_fileInfo.segments[0].TraceCount();
+        int64_t minTraces = m_fileInfo.segments[0].traceCount();
+        int64_t maxTraces = m_fileInfo.segments[0].traceCount();
         int64_t totalSegmentTraces = 0;
         
         for (const auto& seg : m_fileInfo.segments) {
-            int64_t count = seg.TraceCount();
+            int64_t count = seg.traceCount();
             minTraces = std::min(minTraces, count);
             maxTraces = std::max(maxTraces, count);
             totalSegmentTraces += count;
@@ -757,7 +757,7 @@ void SEGYReader::PrintFileInfo() {
             const auto& seg = m_fileInfo.segments[i];
             std::cout << "  Segment " << i << ": PrimaryKey=" << seg.primaryKey 
                       << ", Traces=[" << seg.traceStart << "-" << seg.traceStop << "]"
-                      << ", Count=" << seg.TraceCount() << std::endl;
+                      << ", Count=" << seg.traceCount() << std::endl;
         }
     }
 }
@@ -1256,7 +1256,7 @@ bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, 
                 return false;
             }
 
-            ReadFieldFromHeader(traceHeader, &attrData[idx], attrField, m_fileInfo.headerEndianness);
+            SEGY::readFieldFromHeader(traceHeader, &attrData[idx], attrField, m_fileInfo.headerEndianness);
             idx += size;
         }
 
@@ -1354,7 +1354,7 @@ bool SEGYReader::printTextualHeader(std::string filename) {
 }
 
 
-bool SEGYReader::GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
+bool SEGYReader::getPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
 {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -1368,7 +1368,7 @@ bool SEGYReader::GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, in
     return true;
 }
 
-bool SEGYReader::GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
+bool SEGYReader::getSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
 {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -1383,7 +1383,7 @@ bool SEGYReader::GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, 
 }
 
 
-bool SEGYReader::GetDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval) 
+bool SEGYReader::getDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval) 
 {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";

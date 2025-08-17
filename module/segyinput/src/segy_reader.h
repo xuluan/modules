@@ -41,7 +41,7 @@ namespace SEGY {
         HeaderField() : byteLocation(0), fieldWidth(2), fieldType(DataSampleFormatCode::Unknown) {}
         HeaderField(int loc, int width) : byteLocation(loc), fieldWidth(width), fieldType(DataSampleFormatCode::Unknown) {}
         HeaderField(int loc, int width, DataSampleFormatCode type) : byteLocation(loc), fieldWidth(width), fieldType(type) {}
-        bool Defined() const { return byteLocation != 0; }
+        bool defined() const { return byteLocation != 0; }
     };
     
     // Standard SEGY header field definitions
@@ -59,7 +59,7 @@ namespace SEGY {
     }
     
     // OpenVDS-style ReadFieldFromHeader implementation
-    void ReadFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
+    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
 }
 
 // OpenVDS-style segment information structure
@@ -72,7 +72,7 @@ struct SEGYSegmentInfo {
     SEGYSegmentInfo(int pk, int64_t start) 
         : primaryKey(pk), traceStart(start), traceStop(start), score(0.0f) {}
     
-    int64_t TraceCount() const { return traceStop - traceStart + 1; }
+    int64_t traceCount() const { return traceStop - traceStart + 1; }
 };
 
 // Simplified single-file OpenVDS-style file information structure
@@ -98,8 +98,6 @@ struct SEGYFileInfo {
     int minCrossline, maxCrossline, crosslineCount;
     int primaryStep, secondaryStep;
     bool isPrimaryInline; // true if primary key is inline, false if crossline
-    
-    int TraceByteSize() const { return traceByteSize; }
 };
 
 // Single-file SEGY analyzer based on true OpenVDS algorithms
@@ -119,10 +117,10 @@ private:
     void * m_log_data;
     
     // Smart endianness detection
-    SEGY::Endianness DetectEndianness(const char* binaryHeader, const char* firstTraceHeader);
+    SEGY::Endianness detectEndianness(const char* binaryHeader, const char* firstTraceHeader);
     
     // True OpenVDS segment building algorithm for single file
-    void BuildSegmentInfo(std::ifstream& file);
+    void buildSegmentInfo(std::ifstream& file);
     
     // True OpenVDS representative segment finding for single file
     SEGYSegmentInfo findRepresentativeSegment(int& primaryStep);
@@ -131,10 +129,10 @@ private:
     bool analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segmentInfo, int& secondaryStep, int& fold);
     
     // Calculate coordinate ranges based on segments for trace index conversion
-    void CalculateCoordinateRanges();
+    void calculateCoordinateRanges();
     
     // OpenVDS-style coordinate to sample index conversion
-    int CoordinateToSampleIndex(int coordinate, int coordinateMin, int coordinateMax, int numSamples) const;
+    int coordinateToSampleIndex(int coordinate, int coordinateMin, int coordinateMax, int numSamples) const;
     
     // Fast rectangular grid calculation for regular SEGY data
     int64_t calculateRectangularTraceIndex(int inlineNum, int crosslineNum);
@@ -153,13 +151,13 @@ public:
 
     void setLogData(void *logData) { m_log_data = logData; }
     
-    void AddCustomField(const std::string& name, int byteLocation, int width);
+    void addCustomField(const std::string& name, int byteLocation, int width);
 
-    void AddAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
+    void addAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
 
-    bool Initialize(const std::string& filename);
+    bool initialize(const std::string& filename);
     
-    void PrintFileInfo();
+    void printFileInfo();
 
     SEGY::DataSampleFormatCode getSampleFormatCode() const { return m_fileInfo.dataSampleFormatCode; }
     
@@ -186,11 +184,11 @@ public:
 
     bool printTextualHeader(std::string filename);
 
-    bool GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);
+    bool getPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);
 
-    bool GetSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);
+    bool getSecondaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);
     
-    bool GetDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval);
+    bool getDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval);
 
     std::string getErrMsg() const { return m_lastError; }
     
