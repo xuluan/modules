@@ -234,6 +234,34 @@ void segyinput_process(const char* myid)
 
     int grp_size = job_df.GetGroupSize();
 
+    std::string primary_name = job_df.GetPrimaryKeyName();
+
+    std::string secondary_name = job_df.GetSecondaryKeyName();
+
+    std::string data_name = job_df.GetVolumeDataName();
+
+    //get primary and secondary
+    for(int i = 0; i < job_df.GetNumAttributes(); i++) {
+
+        std::string attr_name = job_df.GetAttributeName(i);
+
+        if((attr_name != primary_name) &&(attr_name != secondary_name)) 
+            continue;
+
+        void *data = job_df.GetWritableBuffer(attr_name.c_str());
+
+        if(attr_name == data_name) {
+            if(!my_data->segy_reader.readTraceByPriIdx(my_data->current_pkey, my_data->fskey, my_data->lskey, 0, my_data->trace_length -1, data)) {
+                throw std::runtime_error("Error: read trace " + my_data->segy_reader.getErrMsg());
+            }
+        } else {
+            if(!my_data->segy_reader.readAttrByPriIdx(attr_name, my_data->current_pkey, my_data->fskey, my_data->lskey, data)) {
+                throw std::runtime_error("Error: read attribute " + my_data->segy_reader.getErrMsg());
+            }
+        }
+
+    }
+
     // prepare for the next call
     my_data->current_pkey = my_data->current_pkey + my_data->pkinc;
 }
