@@ -107,9 +107,26 @@ void segyinput_init(const char* myid, const char* buf)
             job_df.SetSecondaryKeyName(my_data->skey_name.c_str());
         
             // Add trace attribute
-            job_df.AddAttribute(my_data->trace_name.c_str(), 
-                                as::DataFormat::FORMAT_R32, 
-                                my_data->trace_length);
+            as::DataFormat type;
+            SEGY::DataSampleFormatCode format = my_data->segy_reader.getSampleFormatCode();
+            switch (format) {
+                case SEGY::DataSampleFormatCode::Int8:
+                    type = as::DataFormat::FORMAT_U8;
+                    break;
+                case SEGY::DataSampleFormatCode::Int16:
+                    type = as::DataFormat::FORMAT_U16;
+                    break;
+                case SEGY::DataSampleFormatCode::Int32:
+                    type = as::DataFormat::FORMAT_U32;
+                    break;
+                case SEGY::DataSampleFormatCode::IEEEFloat:
+                    type = as::DataFormat::FORMAT_R32;
+                    break;
+                default:
+                    throw std::runtime_error("Error: unsupported SEGY data sample format");
+            }
+            job_df.AddAttribute(my_data->trace_name.c_str(), type, my_data->trace_length);
+            
             job_df.SetVolumeDataName(my_data->trace_name.c_str());    
             
             job_df.SetDataAxisUnit("ms");
@@ -135,10 +152,29 @@ void segyinput_init(const char* myid, const char* buf)
                     std::string name = attr.at("name", "attribute").as_string();
                     std::string datatype = attr.at("datatype", "attribute").as_string();
                     int offset = attr.at("offset", "attribute").as_int();
-                }
-                
-            }            
+                    SEGY::DataSampleFormatCode format;
+                    as::DataFormat type;
 
+                    if (datatype == "int8") {
+                        format = SEGY::DataSampleFormatCode::Int8;
+                        type = as::DataFormat::FORMAT_U8;
+                    } else if (datatype == "int16") {
+                        format = SEGY::DataSampleFormatCode::Int16;
+                        type = as::DataFormat::FORMAT_U16;
+                    } else if (datatype == "int32") {
+                        format = SEGY::DataSampleFormatCode::Int32;
+                        type = as::DataFormat::FORMAT_U32;
+                    } else if (datatype == "float") {
+                        format = SEGY::DataSampleFormatCode::IEEEFloat;
+                        type = as::DataFormat::FORMAT_R32;
+                    } else {
+                        throw std::runtime_error("Error: segyinput the datatype of attribute " + name + " is invalid: " + datatype);
+                    }
+                    my_data->segy_reader.AddAttrField(name, offset, 4, format);
+                    job_df.AddAttribute(name.c_str(), type, 1);
+                    job_df.SetAttributeUnit(name.c_str(), "");
+                }
+            }            
         }
             
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));

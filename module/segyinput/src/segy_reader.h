@@ -20,7 +20,6 @@ namespace SEGY {
     enum { TextualFileHeaderSize = 3200, BinaryFileHeaderSize = 400, TraceHeaderSize = 240 };
     
     enum class Endianness { BigEndian, LittleEndian };
-    enum class FieldWidth { TwoByte, FourByte };
     
     enum class DataSampleFormatCode {
         Unknown = 0, 
@@ -36,29 +35,31 @@ namespace SEGY {
 
     struct HeaderField {
         int byteLocation;
-        FieldWidth fieldWidth;
+        int fieldWidth;
+        DataSampleFormatCode fieldType;
         
-        HeaderField() : byteLocation(0), fieldWidth(FieldWidth::TwoByte) {}
-        HeaderField(int loc, FieldWidth width) : byteLocation(loc), fieldWidth(width) {}
+        HeaderField() : byteLocation(0), fieldWidth(2), fieldType(DataSampleFormatCode::Unknown) {}
+        HeaderField(int loc, int width) : byteLocation(loc), fieldWidth(width), fieldType(DataSampleFormatCode::Unknown) {}
+        HeaderField(int loc, int width, DataSampleFormatCode type) : byteLocation(loc), fieldWidth(width), fieldType(type) {}
         bool Defined() const { return byteLocation != 0; }
     };
     
     // Standard SEGY header field definitions
     namespace BinaryHeader {
-        const HeaderField SampleIntervalHeaderField(17, FieldWidth::TwoByte);
-        const HeaderField NumSamplesHeaderField(21, FieldWidth::TwoByte);
-        const HeaderField DataSampleFormatCodeHeaderField(25, FieldWidth::TwoByte);
+        const HeaderField SampleIntervalHeaderField(17, 2);
+        const HeaderField NumSamplesHeaderField(21, 2);
+        const HeaderField DataSampleFormatCodeHeaderField(25, 2);
     }
     
     namespace TraceHeader {
-        const HeaderField NumSamplesHeaderField(115, FieldWidth::TwoByte);
-        const HeaderField SampleIntervalHeaderField(117, FieldWidth::TwoByte);
-        const HeaderField InlineNumberHeaderField(189, FieldWidth::FourByte);
-        const HeaderField CrosslineNumberHeaderField(193, FieldWidth::FourByte);
+        const HeaderField NumSamplesHeaderField(115, 2);
+        const HeaderField SampleIntervalHeaderField(117, 2);
+        const HeaderField InlineNumberHeaderField(189, 4);
+        const HeaderField CrosslineNumberHeaderField(193, 4);
     }
     
     // OpenVDS-style ReadFieldFromHeader implementation
-    int ReadFieldFromHeader(const void *header, const HeaderField &headerField, Endianness endianness);
+    void ReadFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
 }
 
 // OpenVDS-style segment information structure
@@ -112,6 +113,7 @@ private:
     SEGYFileInfo m_fileInfo;
     std::map<std::string, SEGY::HeaderField> m_customFields;
     std::map<std::string, std::string> m_fieldAliases;
+    std::map<std::string, SEGY::HeaderField> m_attrFields;
     
     // Smart endianness detection
     SEGY::Endianness DetectEndianness(const char* binaryHeader, const char* firstTraceHeader);
@@ -135,33 +137,48 @@ private:
     int64_t calculateRectangularTraceIndex(int inlineNum, int crosslineNum);
     
     // Verify if calculated index matches actual coordinates in SEGY file
-    bool verifyTraceCoordinates(int64_t traceIndex, int expectedInline, int expectedCrossline);
+    bool verifyTraceCoordinates(std::ifstream& file, int64_t traceIndex, int expectedInline, int expectedCrossline);
     
     // Find trace number from inline/crossline coordinates using OpenVDS algorithm
-    int64_t findTraceNumber(int inlineNum, int crosslineNum);
-
+    int64_t findTraceNumber(std::ifstream& file, int inlineNum, int crosslineNum);
+    
     char ebcdicToAscii(unsigned char ebcdicChar);
 
+    int getSampleCodeSize();
 public:
     SEGYReader();
     
     void AddCustomField(const std::string& name, int byteLocation, int width);
-    
+
+    void AddAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
+
     bool Initialize(const std::string& filename);
     
     void PrintFileInfo();
+
+    SEGY::DataSampleFormatCode getSampleFormatCode() const { return m_fileInfo.dataSampleFormatCode; }
     
     // Get trace number with rectangular assumption and fallback to precise search
-    int64_t getTraceNumber(int inlineNum, int crosslineNum);
+    int64_t getTraceNumber(std::ifstream& file,int inlineNum, int crosslineNum);
 
     // Read trace data for a specific inline/crossline
     bool readTrace(int inline_num, int crossline_num, std::vector<float>& traceData);
     
+    // Read trace data for a specific trace number
+    bool readTrace(std::ifstream& file, int64_t trace_num, char *data);
+
     // Read multiple traces in a region
     bool readTraceRegion(int inlineStart, int inlineEnd, 
                         int crosslineStart, int crosslineEnd,
                         std::vector<float>& volumeData); 
-    
+
+    // Read multiple traces by primary index
+    bool readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,
+                        int dataStart, int dataEnd, void* data); 
+
+    // Read multiple attributes by primary index
+    bool readAttrByPriIdx(std::string attr, int priIndex, int sndStart, int sndEnd, void* data); 
+
     bool printTextualHeader(std::string filename);
 
     bool GetPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step);

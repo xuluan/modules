@@ -5,30 +5,44 @@
 
 namespace SEGY {
     // OpenVDS-style ReadFieldFromHeader implementation
-    int ReadFieldFromHeader(const void *header, const HeaderField &headerField, Endianness endianness) {
+    void ReadFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness) {
         if (!headerField.Defined()) {
-            return 0;
+            return;
         }
         
         int index = headerField.byteLocation - 1;
         auto signed_header = reinterpret_cast<const signed char *>(header);
         auto unsigned_header = reinterpret_cast<const unsigned char *>(header);
         
-        if (headerField.fieldWidth == FieldWidth::FourByte) {
+        if (headerField.fieldWidth == 4) {
+            int32_t result;
             if (endianness == Endianness::BigEndian) {
-                return (int32_t)(signed_header[index + 0] << 24 | unsigned_header[index + 1] << 16 | 
+                result = (int32_t)(signed_header[index + 0] << 24 | unsigned_header[index + 1] << 16 | 
                                unsigned_header[index + 2] << 8 | unsigned_header[index + 3]);
             } else {
-                return (int32_t)(signed_header[index + 3] << 24 | unsigned_header[index + 2] << 16 | 
+                result = (int32_t)(signed_header[index + 3] << 24 | unsigned_header[index + 2] << 16 | 
                                unsigned_header[index + 1] << 8 | unsigned_header[index + 0]);
             }
-        } else {
+            *reinterpret_cast<int32_t*>(data) = result;
+        } else if (headerField.fieldWidth == 2) {
+            int16_t result;
             if (endianness == Endianness::BigEndian) {
-                return (int16_t)(signed_header[index + 0] << 8 | unsigned_header[index + 1]);
+                result = (int16_t)(signed_header[index + 0] << 8 | unsigned_header[index + 1]);
             } else {
-                return (int16_t)(signed_header[index + 1] << 8 | unsigned_header[index + 0]);
+                result = (int16_t)(signed_header[index + 1] << 8 | unsigned_header[index + 0]);
             }
+            *reinterpret_cast<int16_t*>(data) = result;
+        } else if (headerField.fieldWidth == 1) {
+            int8_t result = signed_header[index];
+            *reinterpret_cast<int8_t*>(data) = result;
         }
+    }
+    
+    // Helper function for backward compatibility
+    int ReadFieldFromHeaderInt(const void *header, const HeaderField &headerField, Endianness endianness) {
+        int result = 0;
+        ReadFieldFromHeader(header, &result, headerField, endianness);
+        return result;
     }
 }
 
@@ -46,18 +60,44 @@ void SEGYReader::AddCustomField(const std::string& name, int byteLocation, int w
         canonicalName = m_fieldAliases[name];
     }
     
-    SEGY::FieldWidth fieldWidth = (width == 4) ? SEGY::FieldWidth::FourByte : SEGY::FieldWidth::TwoByte;
-    m_customFields[canonicalName] = SEGY::HeaderField(byteLocation, fieldWidth);
+    int fieldWidth = width; // Support 1, 2, or 4 byte widths
+    if (fieldWidth != 1 && fieldWidth != 2 && fieldWidth != 4) {
+        fieldWidth = 2; // Default to 2 bytes for invalid widths
+    }
+
+    SEGY::DataSampleFormatCode format;
+
+    switch (fieldWidth) {
+        case 1: format = SEGY::DataSampleFormatCode::Int8; break;
+        case 2: format = SEGY::DataSampleFormatCode::Int16; break;
+        case 4: format = SEGY::DataSampleFormatCode::Int32; break;
+        default: format = SEGY::DataSampleFormatCode::Unknown; break;
+    }
+    m_customFields[canonicalName] = SEGY::HeaderField(byteLocation, fieldWidth, format);
+    std::cout << "Added custom field: " << canonicalName << " at byte " << byteLocation << " (width: " << width << ")" << std::endl;
+}
+
+void SEGYReader::AddAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
+    std::string canonicalName = name;
+    if (m_fieldAliases.find(name) != m_fieldAliases.end()) {
+        canonicalName = m_fieldAliases[name];
+    }
+    
+    int fieldWidth = width; // Support 1, 2, or 4 byte widths
+    if (fieldWidth != 1 && fieldWidth != 2 && fieldWidth != 4) {
+        fieldWidth = 2; // Default to 2 bytes for invalid widths
+    }
+    m_attrFields[canonicalName] = SEGY::HeaderField(byteLocation, fieldWidth, format);
     std::cout << "Added custom field: " << canonicalName << " at byte " << byteLocation << " (width: " << width << ")" << std::endl;
 }
 
 SEGY::Endianness SEGYReader::DetectEndianness(const char* binaryHeader, const char* firstTraceHeader) {
-    int intervalBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
-    int intervalLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
-    int samplesBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
-    int samplesLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
-    int formatBE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
-    int formatLE_bin = SEGY::ReadFieldFromHeader(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
+    int intervalBE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
+    int intervalLE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
+    int samplesBE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
+    int samplesLE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
+    int formatBE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
+    int formatLE_bin = SEGY::ReadFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
     
     std::cout << "Endianness detection:" << std::endl;
     std::cout << "  Binary Header - BE: interval=" << intervalBE_bin << ", samples=" << samplesBE_bin << ", format=" << formatBE_bin << std::endl;
@@ -97,7 +137,7 @@ void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
     file.read(traceHeader.data(), SEGY::TraceHeaderSize);
     if (file.gcount() != SEGY::TraceHeaderSize) return;
     
-    int currentPrimaryKey = SEGY::ReadFieldFromHeader(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+    int currentPrimaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
     SEGYSegmentInfo currentSegment(currentPrimaryKey, 0);
     
     std::cout << "Starting first segment with PrimaryKey: " << currentPrimaryKey << std::endl;
@@ -109,7 +149,7 @@ void SEGYReader::BuildSegmentInfo(std::ifstream& file) {
         
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
-        int primaryKey = SEGY::ReadFieldFromHeader(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+        int primaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
         
         if (primaryKey == currentSegment.primaryKey) {
             // **OpenVDS logic: Extend current segment**
@@ -247,7 +287,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
         // **OpenVDS validation: Ensure trace belongs to correct segment**
-        int tracePrimaryKey = SEGY::ReadFieldFromHeader(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+        int tracePrimaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
         if (tracePrimaryKey != segmentInfo.primaryKey) {
             std::cout << "Warning: trace " << trace << " has mismatched primary key " 
                       << tracePrimaryKey << " vs expected " << segmentInfo.primaryKey << std::endl;
@@ -255,7 +295,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
         }
         
         // Read secondary key
-        int traceSecondaryKey = SEGY::ReadFieldFromHeader(traceHeader.data(), m_fileInfo.secondaryKey, m_fileInfo.headerEndianness);
+        int traceSecondaryKey = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), m_fileInfo.secondaryKey, m_fileInfo.headerEndianness);
         
         // **Precise OpenVDS gather analysis logic**
         if (gatherFold > 0 && traceSecondaryKey == gatherSecondaryKey) {
@@ -342,10 +382,10 @@ void SEGYReader::CalculateCoordinateRanges() {
             
             if (file.gcount() != SEGY::TraceHeaderSize) break;
             
-            int inlineNum = SEGY::ReadFieldFromHeader(traceHeader.data(), 
+            int inlineNum = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
                 (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
                 m_fileInfo.headerEndianness);
-            int crosslineNum = SEGY::ReadFieldFromHeader(traceHeader.data(), 
+            int crosslineNum = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
                 (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
                 m_fileInfo.headerEndianness);
             
@@ -409,9 +449,7 @@ int64_t SEGYReader::calculateRectangularTraceIndex(int inlineNum, int crosslineN
     return calculatedIndex;
 }
 
-bool SEGYReader::verifyTraceCoordinates(int64_t traceIndex, int expectedInline, int expectedCrossline) {
-    std::ifstream file(m_filename, std::ios::binary);
-    if (!file) return false;
+bool SEGYReader::verifyTraceCoordinates(std::ifstream& file, int64_t traceIndex, int expectedInline, int expectedCrossline) {
     
     std::vector<char> traceHeader(SEGY::TraceHeaderSize);
     file.seekg(SEGY::TextualFileHeaderSize + SEGY::BinaryFileHeaderSize + traceIndex * m_fileInfo.traceByteSize);
@@ -419,17 +457,17 @@ bool SEGYReader::verifyTraceCoordinates(int64_t traceIndex, int expectedInline, 
     
     if (file.gcount() != SEGY::TraceHeaderSize) return false;
     
-    int actualInline = SEGY::ReadFieldFromHeader(traceHeader.data(), 
+    int actualInline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
         (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
         m_fileInfo.headerEndianness);
-    int actualCrossline = SEGY::ReadFieldFromHeader(traceHeader.data(), 
+    int actualCrossline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
         (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
         m_fileInfo.headerEndianness);
         
     return (actualInline == expectedInline && actualCrossline == expectedCrossline);
 }
 
-int64_t SEGYReader::getTraceNumber(int inlineNum, int crosslineNum) {
+int64_t SEGYReader::getTraceNumber(std::ifstream& file, int inlineNum, int crosslineNum) {
     std::cout << "\n=== Fast Trace Finder (Rectangular Grid + Fallback) ===" << std::endl;
     std::cout << "Input: Inline=" << inlineNum << ", Crossline=" << crosslineNum << std::endl;
     
@@ -446,14 +484,14 @@ int64_t SEGYReader::getTraceNumber(int inlineNum, int crosslineNum) {
     
     if (rectangularIndex < 0) {
         std::cout << "Rectangular calculation failed: coordinates out of range" << std::endl;
-        return findTraceNumber(inlineNum, crosslineNum); // Fallback to precise search
+        return findTraceNumber(file, inlineNum, crosslineNum); // Fallback to precise search
     }
     
     std::cout << "Rectangular calculation result: trace " << rectangularIndex << std::endl;
     
     // Step 2: Verify the calculated index
     std::cout << "\nStep 2: Verifying calculated index..." << std::endl;
-    bool isCorrect = verifyTraceCoordinates(rectangularIndex, inlineNum, crosslineNum);
+    bool isCorrect = verifyTraceCoordinates(file, rectangularIndex, inlineNum, crosslineNum);
     
     if (isCorrect) {
         std::cout << "✓ Verification successful: rectangular calculation is correct!" << std::endl;
@@ -463,11 +501,11 @@ int64_t SEGYReader::getTraceNumber(int inlineNum, int crosslineNum) {
     } else {
         std::cout << "✗ Verification failed: SEGY data is not regular rectangular grid" << std::endl;
         std::cout << "Falling back to precise OpenVDS algorithm..." << std::endl;
-        return findTraceNumber(inlineNum, crosslineNum); // Fallback to precise search
+        return findTraceNumber(file, inlineNum, crosslineNum); // Fallback to precise search
     }
 }
 
-int64_t SEGYReader::findTraceNumber(int inlineNum, int crosslineNum) {
+int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int crosslineNum) {
     std::cout << "\n=== Finding Trace Number (OpenVDS Algorithm) ===" << std::endl;
     std::cout << "Input: Inline=" << inlineNum << ", Crossline=" << crosslineNum << std::endl;
     
@@ -527,13 +565,6 @@ int64_t SEGYReader::findTraceNumber(int inlineNum, int crosslineNum) {
     std::cout << "  Trace range: [" << targetSegment->traceStart << " - " << targetSegment->traceStop << "]" << std::endl;
     std::cout << "  Trace count: " << targetSegment->TraceCount() << std::endl;
     
-    // Step 4: Search within the segment for the exact trace
-    std::ifstream file(m_filename, std::ios::binary);
-    if (!file) {
-        std::cout << "Error: Cannot open file for trace search" << std::endl;
-        return -1;
-    }
-    
     std::vector<char> traceHeader(SEGY::TraceHeaderSize);
     
     for (int64_t trace = targetSegment->traceStart; trace <= targetSegment->traceStop; trace++) {
@@ -542,10 +573,10 @@ int64_t SEGYReader::findTraceNumber(int inlineNum, int crosslineNum) {
         
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
-        int traceInline = SEGY::ReadFieldFromHeader(traceHeader.data(), 
+        int traceInline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
             (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
             m_fileInfo.headerEndianness);
-        int traceCrossline = SEGY::ReadFieldFromHeader(traceHeader.data(), 
+        int traceCrossline = SEGY::ReadFieldFromHeaderInt(traceHeader.data(), 
             (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
             m_fileInfo.headerEndianness);
         
@@ -615,9 +646,9 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
     m_fileInfo.headerEndianness = DetectEndianness(binaryHeader.data(), firstTraceHeader.data());
     
     // Read file parameters
-    int interval = SEGY::ReadFieldFromHeader(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
-    int samples = SEGY::ReadFieldFromHeader(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
-    int format = SEGY::ReadFieldFromHeader(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
+    int interval = SEGY::ReadFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
+    int samples = SEGY::ReadFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
+    int format = SEGY::ReadFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
 
     // If binary header invalid, read from trace header
     if (interval <= 0 || samples <= 0) {
@@ -625,10 +656,10 @@ bool SEGYReader::Initialize(const std::string& m_filename) {
         return false;
         /*
         if (interval <= 0) {
-            interval = SEGY::ReadFieldFromHeader(firstTraceHeader.data(), SEGY::TraceHeader::SampleIntervalHeaderField, m_fileInfo.headerEndianness);
+            interval = SEGY::ReadFieldFromHeaderInt(firstTraceHeader.data(), SEGY::TraceHeader::SampleIntervalHeaderField, m_fileInfo.headerEndianness);
         }
         if (samples <= 0) {
-            samples = SEGY::ReadFieldFromHeader(firstTraceHeader.data(), SEGY::TraceHeader::NumSamplesHeaderField, m_fileInfo.headerEndianness);
+            samples = SEGY::ReadFieldFromHeaderInt(firstTraceHeader.data(), SEGY::TraceHeader::NumSamplesHeaderField, m_fileInfo.headerEndianness);
         }
         */
     }
@@ -729,6 +760,105 @@ void SEGYReader::PrintFileInfo() {
     }
 }
 
+int SEGYReader::getSampleCodeSize() {
+    int size = 4;
+    switch (m_fileInfo.dataSampleFormatCode) {
+        case SEGY::DataSampleFormatCode::IEEEFloat: {
+            size = 4; break;
+        }
+        case SEGY::DataSampleFormatCode::Int32: {
+            size = 4; break;
+        }
+        case SEGY::DataSampleFormatCode::Int8: {
+            size = 1; break;
+        }
+        case SEGY::DataSampleFormatCode::Int16: {
+            size = 2; break;
+        }
+        default:
+            size = 4;
+    }
+    return size;    
+}
+
+bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
+
+    if(!data) {
+        m_lastError = "Invalid data point";
+        return false;        
+    }
+
+    // Calculate file position for this trace
+    // SEGY format: 3200 byte textual header + 400 byte binary header + traces
+    int64_t traceStartOffset = 3600 + trace_num * m_fileInfo.traceByteSize + 240;
+    
+    file.seekg(traceStartOffset);
+    if (!file.good()) {
+        m_lastError = "Failed to seek to trace position";
+        return false;
+    }
+
+    int size = getSampleCodeSize();
+
+    // Read sample data
+    file.read(static_cast<char*>(data), m_fileInfo.sampleCount * size);
+    if (file.gcount() != static_cast<std::streamsize>(m_fileInfo.sampleCount * size)) {
+        m_lastError = "Failed to read complete trace data";
+        return false;
+    }
+
+    // Convert binary data to float based on data format
+    if (m_fileInfo.headerEndianness == SEGY::Endianness::BigEndian) {
+        switch (m_fileInfo.dataSampleFormatCode) {
+            case SEGY::DataSampleFormatCode::IEEEFloat: {
+                // IEEE 32-bit floating point
+                float* floatData = reinterpret_cast<float*>(data);
+                for (int i = 0; i < m_fileInfo.sampleCount; i++) {
+                    float value = floatData[i];
+                    uint32_t temp;
+                    std::memcpy(&temp, &value, 4);
+                    temp = ntohl(temp);
+                    std::memcpy(&value, &temp, 4);
+                    floatData[i] = value;
+                }
+                break;
+            }
+            case SEGY::DataSampleFormatCode::Int32: {
+                // 32-bit integer
+                int32_t* intData = reinterpret_cast<int32_t*>(data);
+                for (int i = 0; i < m_fileInfo.sampleCount; i++) {
+                    int32_t value = ntohl(intData[i]);
+                    intData[i] = static_cast<float>(value);
+                }
+                break;
+            }
+            case SEGY::DataSampleFormatCode::Int16: {
+                // 16-bit integer
+                int16_t* shortData = reinterpret_cast<int16_t*>(data);
+                for (int i = 0; i < m_fileInfo.sampleCount; i++) {
+                    int16_t value = ntohs(shortData[i]);
+                    shortData[i] = static_cast<float>(value);
+                }
+                break;
+            }
+            default:
+                // Fallback to IEEE Float format
+                float* floatData = reinterpret_cast<float*>(data);
+                for (int i = 0; i < m_fileInfo.sampleCount; i++) {
+                    float value = floatData[i];
+                    uint32_t temp;
+                    std::memcpy(&temp, &value, 4);
+                    temp = ntohl(temp);
+                    std::memcpy(&value, &temp, 4);
+                    floatData[i] = value;
+                }
+                break;
+        }    
+    }
+    
+    return true;
+}
+
 bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>& traceData) {
     if (!m_initialized) {
         m_lastError = "SEGY reader not initialized";
@@ -745,21 +875,21 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
     try {
         // Resize trace data vector
         traceData.resize(m_fileInfo.sampleCount);
-        
-        // Calculate trace number from inline/crossline coordinates  
-        int64_t traceNumber = getTraceNumber(inline_num, crossline_num);
-        if (traceNumber < 0) {
-            m_lastError = "Invalid trace coordinates";
-            return false;
-        }
-        
         // Open SEGY file for reading
         std::ifstream file(m_filename, std::ios::binary);
         if (!file.is_open()) {
             m_lastError = "Cannot open SEGY file for reading";
             return false;
         }
+                
+        // Calculate trace number from inline/crossline coordinates  
+        int64_t traceNumber = getTraceNumber(file, inline_num, crossline_num);
+        if (traceNumber < 0) {
+            m_lastError = "Invalid trace coordinates";
+            return false;
+        }
         
+
         // Calculate file position for this trace
         // SEGY format: 3200 byte textual header + 400 byte binary header + traces
         int64_t traceStartOffset = 3600 + traceNumber * m_fileInfo.traceByteSize;
@@ -964,6 +1094,95 @@ bool SEGYReader::readTraceRegion(int inlineStart, int inlineEnd,
     }
 }
 
+// Read multiple traces by primary index
+bool SEGYReader::readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,
+                    int dataStart, int dataEnd, void* data)
+{
+    if (!m_initialized) {
+        m_lastError = "SEGY reader not initialized";
+        return false;
+    }
+
+    // Validate region bounds
+    if (priIndex < m_fileInfo.minInline || priIndex > m_fileInfo.maxInline ||
+        sndStart < m_fileInfo.minCrossline || sndEnd > m_fileInfo.maxCrossline ||
+        sndStart > sndEnd || dataStart > dataEnd ||
+        dataStart < 0 || dataEnd >= m_fileInfo.sampleCount) {
+        m_lastError = "Invalid region bounds";
+        return false;
+    }
+
+    if(!data) {
+        m_lastError = "Invalid data point";
+        return false;        
+    }
+
+    std::ifstream file(m_filename, std::ios::binary);
+    if (!file) {
+        m_lastError = "Error: Cannot open file for trace: " + m_filename ;
+        return false;
+    }
+
+    try {
+        char *volumeData = static_cast<char*>(data);
+        
+        std::cout << "Reading region: Primary index: " << priIndex 
+                  << ", Crossline: " << sndStart << "-" << sndEnd << std::endl;
+        
+        // Read traces in the region
+        std::vector<char> traceData;
+        // Resize trace data vector
+        int sampleCodeSize = getSampleCodeSize();
+        traceData.resize(m_fileInfo.sampleCount*sampleCodeSize);
+        int step = m_fileInfo.secondaryStep;
+        int trace_length = (dataEnd - dataStart + 1) * sampleCodeSize;
+        int idx = 0;
+
+
+        for (int xl = sndStart; xl <= sndEnd; xl+=step) {
+            //get trace number
+
+            int64_t traceNum = getTraceNumber(file, priIndex, xl);
+
+            if (traceNum < 0) {
+                m_lastError = "Invalid trace coordinates";
+                file.close();
+                return false;
+            }
+
+            // Read trace data
+            if (!readTrace(file, traceNum, traceData.data())) {
+                file.close();
+                return false;
+            }
+            char *data = static_cast<char*>(traceData.data());
+
+            // Copy trace data to volume array
+            std::memcpy(&volumeData[idx], &data[dataStart*sampleCodeSize], trace_length);
+
+            idx +=trace_length;
+        }
+
+        std::cout << "Successfully read Primary index: " << priIndex << std::endl;
+        file.close();
+        return true;
+        
+    } catch (const std::exception& e) {
+        m_lastError = std::string("Error reading trace region: ") + e.what();
+        file.close();
+        return false;
+    }
+
+}
+
+// Read multiple attributes by primary index
+bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, int sndEnd, void* data)
+{
+
+    return true;
+}
+
+
 char SEGYReader::ebcdicToAscii(unsigned char ebcdicChar) {
     // EBCDIC to ASCII conversion table
     static const unsigned char ebcdic_to_ascii[256] = {
@@ -1092,3 +1311,4 @@ bool SEGYReader::GetDataAxis(float& min_val, float& max_val, int& num_vals, int&
 
     return true;
 }
+
