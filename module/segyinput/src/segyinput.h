@@ -34,6 +34,8 @@ struct Segyinput {
     int num_skey;
     int num_pkey;
     int current_pkey;
+    std::vector<int> pkeys;
+    std::vector<int> skeys;    
     void* logger;
 };
 

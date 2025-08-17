@@ -142,6 +142,12 @@ void segyinput_init(const char* myid, const char* buf)
             // set up secondary key axis
             job_df.SetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey);
 
+            my_data->skeys.clear();
+            for (int i = my_data->fskey; i <= my_data->lskey;) {
+                my_data->skeys.push_back(i);
+                i += my_data->skinc;
+            }
+
             // add sttributes
             auto& attrs = config["testgendata"]["attribute"];
             if(attrs.is_array()) {
@@ -232,8 +238,34 @@ void segyinput_process(const char* myid)
         }
     }
 
-    int grp_size = job_df.GetGroupSize();
+    // setup primary and secondary
 
+    int grp_size = job_df.GetGroupSize();
+    int* pkey;
+    pkey = static_cast<int*>(job_df.GetWritableBuffer(job_df.GetPrimaryKeyName()));
+    if(pkey == nullptr) {
+        gd_logger.LogError(my_logger, "DF returned a nullptr to the buffer of pkey is NULL");
+        job_df.SetJobAborted();
+        _clean_up();
+        return;
+    }
+
+    std::fill(pkey, pkey + grp_size, my_data->current_pkey);
+    gd_logger.LogInfo(my_logger, "Process primary key {}\n", pkey[0]);
+
+    int* skey;
+    skey = static_cast<int*>(job_df.GetWritableBuffer(job_df.GetSecondaryKeyName()));
+    if(skey == nullptr) {
+        gd_logger.LogError(my_logger, "DF returned a nullptr to the buffer of skey is NULL");
+        job_df.SetJobAborted();
+        _clean_up();
+        return;
+    }
+
+    std::copy(my_data->skeys.begin(), my_data->skeys.end(), skey);
+    
+    
+    // setup data and attributes
     std::string primary_name = job_df.GetPrimaryKeyName();
 
     std::string secondary_name = job_df.GetSecondaryKeyName();
