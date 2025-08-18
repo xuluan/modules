@@ -24,8 +24,6 @@ void segyinput_init(const char* myid, const char* buf)
 
     my_data->logger = my_logger;
 
-    my_data->segy_reader.setLogData(my_logger);
-
     auto& job_df = df::GeoDataFlow::GetInstance();
 
     // A handy function to clean up resources if errors happen

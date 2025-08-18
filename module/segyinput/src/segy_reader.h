@@ -148,8 +148,6 @@ private:
     int getSampleCodeSize();
 public:
     SEGYReader();
-
-    void setLogData(void *logData) { m_log_data = logData; }
     
     void addCustomField(const std::string& name, int byteLocation, int width);
 
