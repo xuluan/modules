@@ -184,7 +184,9 @@ void segyinput_init(const char* myid, const char* buf)
                     job_df.AddAttribute(name.c_str(), type, 1);
                     job_df.SetAttributeUnit(name.c_str(), "");
                 }
-            }            
+            }   
+            
+            my_data->segy_reader.printFileInfo();
         }
             
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
@@ -266,8 +268,7 @@ void segyinput_process(const char* myid)
         return;
     }
 
-    std::copy(my_data->skeys.begin(), my_data->skeys.end(), skey);
-    
+    std::copy(my_data->skeys.begin(), my_data->skeys.end(), skey);    
     
     // setup data and attributes
     std::string primary_name = job_df.GetPrimaryKeyName();

@@ -2,7 +2,7 @@
 #include <GdLogger.h>
 #include "segy_reader.h"
 
-//#define DEBUG_EN 1
+#define DEBUG_DUMP 0
 
 namespace SEGY {
     // OpenVDS-style ReadFieldFromHeader implementation
@@ -100,11 +100,11 @@ SEGY::Endianness SEGYReader::detectEndianness(const char* binaryHeader, const ch
     int samplesLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
     int formatBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
     int formatLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
-    
+#if DEBUG_DUMP     
     std::cout << "Endianness detection:" << std::endl;
     std::cout << "  Binary Header - BE: interval=" << intervalBE_bin << ", samples=" << samplesBE_bin << ", format=" << formatBE_bin << std::endl;
     std::cout << "  Binary Header - LE: interval=" << intervalLE_bin << ", samples=" << samplesLE_bin << ", format=" << formatLE_bin << std::endl;
-    
+#endif    
     bool beValid = (intervalBE_bin > 0 && intervalBE_bin < 100000) &&
                    (samplesBE_bin > 0 && samplesBE_bin < 100000) &&
                    (formatBE_bin >= 1 && formatBE_bin <= 16);
@@ -159,7 +159,7 @@ void SEGYReader::buildSegmentInfo(std::ifstream& file) {
         } else {
             // **OpenVDS logic: Complete current segment, start new segment**
             m_fileInfo.segments.push_back(currentSegment);
-#ifdef DEBUG_EN             
+#if DEBUG_DUMP            
             std::cout << "Completed segment: PrimaryKey=" << currentSegment.primaryKey 
                       << ", Traces=[" << currentSegment.traceStart << "-" << currentSegment.traceStop << "]"
                       << ", Count=" << currentSegment.traceCount() << std::endl;
@@ -167,7 +167,7 @@ void SEGYReader::buildSegmentInfo(std::ifstream& file) {
             // Start new segment
             currentSegment = SEGYSegmentInfo(primaryKey, trace);
         }
-#ifdef DEBUG_EN        
+#if DEBUG_DUMP      
         // Report progress every 1000 traces
         if (trace % 1000 == 0) {
             std::cout << "  Processed " << trace << "/" << lastTrace << " traces, current segments: " << m_fileInfo.segments.size() + 1 << std::endl;
@@ -336,6 +336,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
     std::cout << "  Maximum fold: " << fold << std::endl;
     std::cout << "  Unique secondary keys: " << secondaryKeyCount.size() << std::endl;
     
+#if DEBUG_DUMP
     // Show secondary key distribution statistics
     if (!secondaryKeyCount.empty()) {
         auto minMax = std::minmax_element(secondaryKeyCount.begin(), secondaryKeyCount.end(),
@@ -349,7 +350,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
             if (++count >= 10) break;
         }
     }
-    
+#endif    
     return true;
 }
 
@@ -470,6 +471,7 @@ bool SEGYReader::verifyTraceCoordinates(std::ifstream& file, int64_t traceIndex,
 }
 
 int64_t SEGYReader::getTraceNumber(std::ifstream& file, int inlineNum, int crosslineNum) {
+#if DEBUG_DUMP    
     std::cout << "\n=== Fast Trace Finder (Rectangular Grid + Fallback) ===" << std::endl;
     std::cout << "Input: Inline=" << inlineNum << ", Crossline=" << crosslineNum << std::endl;
     
@@ -481,7 +483,7 @@ int64_t SEGYReader::getTraceNumber(std::ifstream& file, int inlineNum, int cross
     std::cout << "  Secondary step: " << m_fileInfo.secondaryStep << std::endl;
     std::cout << "  Inline range: [" << m_fileInfo.minInline << " - " << m_fileInfo.maxInline << "] (" << m_fileInfo.inlineCount << " values)" << std::endl;
     std::cout << "  Crossline range: [" << m_fileInfo.minCrossline << " - " << m_fileInfo.maxCrossline << "] (" << m_fileInfo.crosslineCount << " values)" << std::endl;
-    
+#endif    
     int64_t rectangularIndex = calculateRectangularTraceIndex(inlineNum, crosslineNum);
     
     if (rectangularIndex < 0) {
@@ -492,12 +494,10 @@ int64_t SEGYReader::getTraceNumber(std::ifstream& file, int inlineNum, int cross
     std::cout << "Rectangular calculation result: trace " << rectangularIndex << std::endl;
     
     // Step 2: Verify the calculated index
-    std::cout << "\nStep 2: Verifying calculated index..." << std::endl;
     bool isCorrect = verifyTraceCoordinates(file, rectangularIndex, inlineNum, crosslineNum);
     
     if (isCorrect) {
-        std::cout << "✓ Verification successful: rectangular calculation is correct!" << std::endl;
-        std::cout << "Fast result: Inline " << inlineNum << ", Crossline " << crosslineNum 
+        std::cout << "Verification successful:  Fast result: Inline " << inlineNum << ", Crossline " << crosslineNum 
                   << " -> Trace " << rectangularIndex << std::endl;
         return rectangularIndex;
     } else {
@@ -508,9 +508,10 @@ int64_t SEGYReader::getTraceNumber(std::ifstream& file, int inlineNum, int cross
 }
 
 int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int crosslineNum) {
+#if DEBUG_DUMP    
     std::cout << "\n=== Finding Trace Number (OpenVDS Algorithm) ===" << std::endl;
     std::cout << "Input: Inline=" << inlineNum << ", Crossline=" << crosslineNum << std::endl;
-    
+#endif    
     // Validate coordinates are within range
     if (inlineNum < m_fileInfo.minInline || inlineNum > m_fileInfo.maxInline ||
         crosslineNum < m_fileInfo.minCrossline || crosslineNum > m_fileInfo.maxCrossline) {
@@ -523,11 +524,11 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
     // Step 1: Convert coordinates to indices using OpenVDS algorithm
     int inlineIndex = coordinateToSampleIndex(inlineNum, m_fileInfo.minInline, m_fileInfo.maxInline, m_fileInfo.inlineCount);
     int crosslineIndex = coordinateToSampleIndex(crosslineNum, m_fileInfo.minCrossline, m_fileInfo.maxCrossline, m_fileInfo.crosslineCount);
-    
+#if DEBUG_DUMP    
     std::cout << "Coordinate to index conversion:" << std::endl;
     std::cout << "  Inline " << inlineNum << " -> index " << inlineIndex << std::endl;
     std::cout << "  Crossline " << crosslineNum << " -> index " << crosslineIndex << std::endl;
-    
+#endif    
     // Step 2: Determine primary and secondary indices based on key ordering
     int primaryIndex, secondaryIndex;
     int primaryCoord, secondaryCoord;
@@ -543,11 +544,11 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
         primaryCoord = crosslineNum;
         secondaryCoord = inlineNum;
     }
-    
+#if DEBUG_DUMP    
     std::cout << "Primary/Secondary mapping:" << std::endl;
     std::cout << "  Primary key (" << (m_fileInfo.isPrimaryInline ? "Inline" : "Crossline") << "): " << primaryCoord << " -> index " << primaryIndex << std::endl;
     std::cout << "  Secondary key (" << (m_fileInfo.isPrimaryInline ? "Crossline" : "Inline") << "): " << secondaryCoord << " -> index " << secondaryIndex << std::endl;
-    
+#endif    
     // Step 3: Find the segment containing this primary key
     SEGYSegmentInfo* targetSegment = nullptr;
     for (auto& segment : m_fileInfo.segments) {
@@ -561,12 +562,12 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
         std::cout << "Error: No segment found for primary key " << primaryCoord << std::endl;
         return -1;
     }
-    
+#if DEBUG_DUMP    
     std::cout << "Found target segment:" << std::endl;
     std::cout << "  Primary key: " << targetSegment->primaryKey << std::endl;
     std::cout << "  Trace range: [" << targetSegment->traceStart << " - " << targetSegment->traceStop << "]" << std::endl;
     std::cout << "  Trace count: " << targetSegment->traceCount() << std::endl;
-    
+#endif    
     std::vector<char> traceHeader(SEGY::TraceHeaderSize);
     
     for (int64_t trace = targetSegment->traceStart; trace <= targetSegment->traceStop; trace++) {
@@ -608,7 +609,7 @@ bool SEGYReader::initialize(const std::string& m_filename) {
     
     std::ifstream file(m_filename, std::ios::binary);
     if (!file) {
-        std::cerr << "Error: Cannot open file " << m_filename << std::endl;
+        m_lastError = "Error: Cannot open file " + m_filename;
         return false;
     }
 
@@ -640,7 +641,7 @@ bool SEGYReader::initialize(const std::string& m_filename) {
     file.read(firstTraceHeader.data(), SEGY::TraceHeaderSize);
     
     if (file.gcount() != SEGY::TraceHeaderSize) {
-        std::cerr << "Error: Cannot read trace header" << std::endl;
+        m_lastError = "Error: Cannot read trace header";
         return false;
     }
     
@@ -654,7 +655,7 @@ bool SEGYReader::initialize(const std::string& m_filename) {
 
     // If binary header invalid, read from trace header
     if (interval <= 0 || samples <= 0) {
-        std::cout << "Binary header invalid, using trace header..." << std::endl;
+        m_lastError = "Binary header invalid, using trace header...";
         return false;
         /*
         if (interval <= 0) {
@@ -1271,7 +1272,6 @@ bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, 
     }
 }
 
-
 char SEGYReader::ebcdicToAscii(unsigned char ebcdicChar) {
     // EBCDIC to ASCII conversion table
     static const unsigned char ebcdic_to_ascii[256] = {
@@ -1306,7 +1306,7 @@ char SEGYReader::ebcdicToAscii(unsigned char ebcdicChar) {
 bool SEGYReader::printTextualHeader(std::string filename) {
     try {
         std::cout << "Reading SEGY Textual Header (3200 bytes)..." << std::endl;
-        m_logger->LogInfo(m_log_data, "Reading SEGY Textual Header (3200 bytes) from file: {}" , filename);
+        m_logger->LogDebug(m_log_data, "Reading SEGY Textual Header (3200 bytes) from file: {}" , filename);
         std::ifstream file(filename, std::ios::binary);
         if (!file.is_open()) {
             std::cout << "Error: Cannot open SEGY file: " << filename << std::endl;
@@ -1352,7 +1352,6 @@ bool SEGYReader::printTextualHeader(std::string filename) {
         return false;
     }
 }
-
 
 bool SEGYReader::getPrimaryKeyAxis(int& min_val, int& max_val, int& num_vals, int& step)
 {
