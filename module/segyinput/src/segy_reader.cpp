@@ -77,7 +77,7 @@ void SEGYReader::addCustomField(const std::string& name, int byteLocation, int w
         default: format = SEGY::DataSampleFormatCode::Unknown; break;
     }
     m_customFields[canonicalName] = SEGY::HeaderField(byteLocation, fieldWidth, format);
-    m_logger->LogDebug(m_log_data, "Added custom field: {} at byte {} (width: {})", canonicalName, byteLocation, width);
+    m_logger->LogInfo(m_log_data, "Added custom field: {} at byte {} (width: {})", canonicalName, byteLocation, width);
 }
 
 void SEGYReader::addAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
@@ -91,7 +91,7 @@ void SEGYReader::addAttrField(const std::string& name, int byteLocation, int wid
         fieldWidth = 2; // Default to 2 bytes for invalid widths
     }
     m_attrFields[canonicalName] = SEGY::HeaderField(byteLocation, fieldWidth, format);
-    m_logger->LogDebug(m_log_data, "Added custom field: {} at byte {} (width: {})", canonicalName, byteLocation, width);
+    m_logger->LogInfo(m_log_data, "Added Attr field: {} at byte {} (width: {})", canonicalName, byteLocation, width);
 }
 
 SEGY::Endianness SEGYReader::detectEndianness(const char* binaryHeader, const char* firstTraceHeader) {

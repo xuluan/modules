@@ -149,10 +149,10 @@ void segyinput_init(const char* myid, const char* buf)
             }
 
             // add sttributes
-            auto& attrs = config["testgendata"]["attribute"];
+            auto& attrs = config["segyinput"]["attribute"];
             if(attrs.is_array()) {
                 //parse attributes
-                auto& arr = config["testgendata"]["attribute"].as_array();
+                auto& arr = config["segyinput"]["attribute"].as_array();
                 for (size_t i = 0; i < arr.size(); ++i) {
                     auto& attr = arr[i];
                     std::string name = attr.at("name", "attribute").as_string();
@@ -280,7 +280,7 @@ void segyinput_process(const char* myid)
 
         std::string attr_name = job_df.GetAttributeName(i);
 
-        if((attr_name != primary_name) &&(attr_name != secondary_name)) 
+        if((attr_name == primary_name) || (attr_name == secondary_name)) 
             continue;
 
         void *data = job_df.GetWritableBuffer(attr_name.c_str());
