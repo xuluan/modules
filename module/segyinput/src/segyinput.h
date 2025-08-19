@@ -28,6 +28,8 @@ struct Segyinput {
     int pkinc;
     int skinc;
     int trace_length;
+    int trace_start;
+    int trace_end;        
     int sinterval;
     float tmin;
     float tmax;

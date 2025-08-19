@@ -90,6 +90,51 @@
   "default": "25",
   "width": "default"
 },
+"primary_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start of the primary",
+  "format": "int",
+  "width": "default"
+},
+"primary_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end of the primary",
+  "format": "int",
+  "default": "25",
+  "width": "default"
+},
+"secondary_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start of the secondary",
+  "format": "int",
+  "width": "default"
+},
+"secondary_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end of the secondary",
+  "format": "int",
+  "default": "25",
+  "width": "default"
+},
+"trace_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start number of the trace, default: 0",
+  "format": "int",
+  "width": "default"
+},
+"trace_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end number of the trace, default: trace_length - 1",
+  "format": "int",
+  "default": "25",
+  "width": "default"
+},
 "attribute": {
   "required": false,
   "repeatable": true,

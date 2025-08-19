@@ -97,6 +97,67 @@ void segyinput_init(const char* myid, const char* buf)
             my_data->segy_reader.getSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
             my_data->segy_reader.getDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
 
+            try {
+                int i = segyin_config.at("primary_start", "segyinput").as_int();
+                if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
+                    my_data->fpkey = i;
+                }
+            } catch (const std::exception& e) {
+                gd_logger.LogDebug(my_logger, e.what());
+            }
+
+            try {
+                int i = segyin_config.at("primary_end", "segyinput").as_int();
+                if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
+                    my_data->lpkey = i;
+                }
+            } catch (const std::exception& e) {
+                gd_logger.LogDebug(my_logger, e.what());
+            }
+
+            try {
+                int i = segyin_config.at("secondary_start", "segyinput").as_int();
+                if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
+                    my_data->fskey = i;
+                }
+            } catch (const std::exception& e) {
+                gd_logger.LogDebug(my_logger, e.what());
+            }
+
+            try {
+                int i = segyin_config.at("secondary_end", "segyinput").as_int();
+                if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
+                    my_data->lskey = i;
+                }
+            } catch (const std::exception& e) {
+                gd_logger.LogDebug(my_logger, e.what());
+            }
+
+            my_data->trace_start = 0;
+            my_data->trace_end = my_data->trace_length - 1;
+
+            try {
+                int i = segyin_config.at("trace_start", "segyinput").as_int();
+                if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
+                    my_data->trace_start = i;
+                    my_data->tmin = my_data->sinterval/ 1000.0 * i;
+                }
+            } catch (const std::exception& e) {
+                gd_logger.LogDebug(my_logger, e.what());
+            }
+
+            try {
+                int i = segyin_config.at("trace_end", "segyinput").as_int();
+                if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
+                    my_data->trace_end = i;
+                    my_data->tmax = my_data->sinterval/ 1000.0 * i;
+
+                }
+            } catch (const std::exception& e) {
+                gd_logger.LogDebug(my_logger, e.what());
+            }
+            
+            
             my_data->current_pkey = my_data->fpkey;
 
             // Add primary and secondary attribute
@@ -183,7 +244,6 @@ void segyinput_init(const char* myid, const char* buf)
                     job_df.SetAttributeUnit(name.c_str(), "");
                 }
             }   
-            
             my_data->segy_reader.printFileInfo();
         }
             
@@ -286,7 +346,7 @@ void segyinput_process(const char* myid)
         void *data = job_df.GetWritableBuffer(attr_name.c_str());
 
         if(attr_name == data_name) {
-            if(!my_data->segy_reader.readTraceByPriIdx(my_data->current_pkey, my_data->fskey, my_data->lskey, 0, my_data->trace_length -1, data)) {
+            if(!my_data->segy_reader.readTraceByPriIdx(my_data->current_pkey, my_data->fskey, my_data->lskey, my_data->trace_start, my_data->trace_end, data)) {
                 throw std::runtime_error("Error: read trace " + my_data->segy_reader.getErrMsg());
             }
         } else {
