@@ -100,7 +100,7 @@ void segyinput_init(const char* myid, const char* buf)
             try {
                 int i = segyin_config.at("primary_start", "segyinput").as_int();
                 if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
-                    my_data->fpkey = i;
+                    my_data->fpkey = (i - my_data->lpkey)/my_data->pkinc * my_data->pkinc + my_data->lpkey;
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
@@ -114,6 +114,8 @@ void segyinput_init(const char* myid, const char* buf)
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
             }
+
+            my_data->num_pkey = my_data->lpkey - my_data->fpkey + 1;
 
             try {
                 int i = segyin_config.at("secondary_start", "segyinput").as_int();
@@ -132,6 +134,7 @@ void segyinput_init(const char* myid, const char* buf)
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
             }
+            my_data->num_skey = my_data->lskey - my_data->fskey + 1;
 
             my_data->trace_start = 0;
             my_data->trace_end = my_data->trace_length - 1;
@@ -156,6 +159,8 @@ void segyinput_init(const char* myid, const char* buf)
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
             }
+
+            my_data->trace_length = my_data->trace_end - my_data->trace_start + 1;
             
             
             my_data->current_pkey = my_data->fpkey;

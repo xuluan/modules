@@ -1189,7 +1189,7 @@ bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, 
         return false;        
     }
 
-    if(m_attrFields.find(attr) == m_customFields.end()) {
+    if(m_attrFields.find(attr) == m_attrFields.end()) {
         m_lastError = "Attribut " + attr + " doesn't exist.";
         return false;         
     }
@@ -1213,7 +1213,7 @@ bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, 
         int step = m_fileInfo.secondaryStep;
         int idx = 0;
         int start = (sndStart - m_fileInfo.minCrossline) / step * step + m_fileInfo.minCrossline;
-        int end = (sndEnd - m_fileInfo.minCrossline) / step * step + m_fileInfo.minCrossline;
+        int end = sndEnd;
 
         for (int xl = start; xl <= end; xl+=step) {
             //get trace number
