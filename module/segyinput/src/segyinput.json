@@ -162,6 +162,6 @@
     "type": "argument",
     "required": true,
     "help": "the offset of attribute at trace headers",
-    "format": "int",
+    "format": "int"
   }
-}
+
