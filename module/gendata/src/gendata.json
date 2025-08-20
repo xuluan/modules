@@ -1,5 +1,5 @@
 "name": "gendata",
-"version": "1.1.1",
+"version": "1.1.2",
 "use_mpi": false,
 "use_cuda": false,
 "dataname": {
