@@ -102,7 +102,6 @@
   "required": false,
   "help": "the end of the primary",
   "format": "int",
-  "default": "25",
   "width": "default"
 },
 "secondary_start":{
@@ -117,7 +116,6 @@
   "required": false,
   "help": "the end of the secondary",
   "format": "int",
-  "default": "25",
   "width": "default"
 },
 "trace_start":{
@@ -132,7 +130,6 @@
   "required": false,
   "help": "the end number of the trace, default: trace_length - 1",
   "format": "int",
-  "default": "25",
   "width": "default"
 },
 "attribute": {

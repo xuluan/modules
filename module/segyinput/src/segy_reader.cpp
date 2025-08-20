@@ -831,7 +831,7 @@ bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
                 int16_t* shortData = reinterpret_cast<int16_t*>(data);
                 for (int i = 0; i < m_fileInfo.sampleCount; i++) {
                     int16_t value = ntohs(shortData[i]);
-                    shortData[i] = static_cast<float>(value);
+                    shortData[i] = static_cast<int16_t>(value);
                 }
                 break;
             }
@@ -954,7 +954,7 @@ bool SEGYReader::readTrace(int inline_num, int crossline_num, std::vector<float>
         }
         
         // Read sample data
-        std::vector<char> rawSampleData(m_fileInfo.sampleCount * 4); // Assume 4 bytes per sample
+        std::vector<char> rawSampleData(m_fileInfo.sampleCount * getSampleCodeSize());
         file.read(rawSampleData.data(), rawSampleData.size());
         if (file.gcount() != static_cast<std::streamsize>(rawSampleData.size())) {
             m_lastError = "Failed to read complete trace data";

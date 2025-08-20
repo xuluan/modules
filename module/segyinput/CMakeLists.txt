@@ -56,5 +56,6 @@ install(TARGETS
 
 install(FILES
   src/segyinput.json
+  README.md
   DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
