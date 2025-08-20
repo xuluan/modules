@@ -110,7 +110,7 @@ void testgendata_init(const char* myid, const char* buf)
             attr_config.sequenceData.max = tracekey_data.at("max", "tracekey_data").as_float();
             attr_config.sequenceData.step = tracekey_data.at("step", "tracekey_data").as_float();
             attr_config.sequenceData.type = as::string_to_data_format(tracekey_data.at("type", "tracekey_data").as_string());
-            t = attr_config.randomData.type;
+            t = attr_config.sequenceData.type;
         } else {
             throw std::runtime_error("Error tracekey data, should be random or sequence : " + data_type);
         }
@@ -159,7 +159,7 @@ void testgendata_init(const char* myid, const char* buf)
         return;
         }
 
-        //todo : fill trace data
+        //fill trace data
         std::fill(trc, trc + my_data->num_skey * my_data->trace_length, 0.f); 
 
 
@@ -226,10 +226,14 @@ void testgendata_init(const char* myid, const char* buf)
             DataGenerator generator(my_data->attrs[i].name + ".DAT");
             void * data = job_df.GetWritableBuffer(my_data->attrs[i].name.c_str());
             if(my_data->attrs[i].dataType == DataType::RANDOM) {
-                generator.gen_random_data(data, my_data->attrs[i].randomData, my_data->attrs[i].length * grp_size);
+                if(!generator.gen_random_data(data, my_data->attrs[i].randomData, my_data->attrs[i].length * grp_size)) {
+                    gd_logger.LogError(my_logger, "Failed to generate random data: {}", generator.get_error_message());
+                }
                 
             } else if (my_data->attrs[i].dataType == DataType::SEQUENCE) {
-                generator.gen_sequence_data(data, my_data->attrs[i].sequenceData, my_data->attrs[i].length * grp_size);
+                if(!generator.gen_sequence_data(data, my_data->attrs[i].sequenceData, my_data->attrs[i].length * grp_size)) {
+                    gd_logger.LogError(my_logger, "Failed to generate sequence data: {}", generator.get_error_message());
+                }
             }
         }
 
