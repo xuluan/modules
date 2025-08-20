@@ -6,7 +6,7 @@
 #include <string>
 #include <utl_string.h>
 
-bool validAtrrName(const std::string& str) {
+bool validAttrName(const std::string& str) {
 
     if (str.empty()) {
         return false;
@@ -66,7 +66,8 @@ void attrcalc_init(const char* myid, const char* buf)
             throw std::runtime_error("Failed to get attrcalc datatype. Error: " + mod_conf.ErrorMessage());
         }
 
-
+        job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
+        
         // setup attributes
         std::vector<std::string> variables;
         std::map<std::string, int> vars_map;
@@ -102,7 +103,7 @@ void attrcalc_init(const char* myid, const char* buf)
             if(it != variables.end()) {
                 throw std::runtime_error("Attr Name exists: " + my_data->name);
             }            
-            if (!validAtrrName(my_data->name)) {
+            if (!validAttrName(my_data->name)) {
                 throw std::runtime_error("Attr Name is invalid. It must start with a letter or an underscore: " + my_data->name);
             }
             variables.push_back(my_data->name);
@@ -138,8 +139,6 @@ void attrcalc_init(const char* myid, const char* buf)
             my_data->attr_data.length = (size_t)prev;
             job_df.AddAttribute(my_data->name.c_str(), my_data->attr_data.type, my_data->attr_data.length);
         }
-        
-        job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
 
         gd_logger.LogInfo(my_logger, "Attr name: {}, datatype: {}, action: {}, expr: {} ", my_data->name, my_data->type, my_data->action, my_data->expr);
 
