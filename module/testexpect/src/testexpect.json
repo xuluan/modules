@@ -1,4 +1,4 @@
-"name": "testgendata",
+"name": "testexpect",
 "version": "1.0.0",
 "use_mpi": false,
 "use_cuda": false

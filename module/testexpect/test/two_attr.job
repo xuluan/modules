@@ -68,7 +68,6 @@
     - name: attr2
       unit: ms
       length: 1
-      data:
       type: float
       pattern: SAME
 

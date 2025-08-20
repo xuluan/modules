@@ -177,6 +177,8 @@ void testexpect_init(const char* myid, const char* buf)
         my_data->fpkey = primarykey.at("first", "primarykey").as_int();
         my_data->lpkey = primarykey.at("last", "primarykey").as_int();
         my_data->pkinc = primarykey.at("step", "primarykey").as_int();
+
+        my_data->current_pkey = my_data->fpkey;
         
         gd_logger.LogInfo(my_logger, "Primary Axis: {}, Type: {}, Length: {}, [{} -- {}] "
             , my_data->pkey_name, "int", 1, my_data->fpkey, my_data->lpkey);

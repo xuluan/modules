@@ -19,10 +19,6 @@ enum class CheckPattern {
     CHECK_PATTERN_NUM
 };
 
-std::string to_string(CheckPattern c);
-CheckPattern to_checkpattern(std::string s);
-
-
 struct AttrConfig {
     std::string name;
     std::string unit;

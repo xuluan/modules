@@ -47,7 +47,7 @@ bool check_data_complex_1(Testexpect* my_data, std::string&  attr_name, AttrData
         throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
     }
 #if DEBUG_DUMP        
-    printf("check_data_plus_mul, dump attr %s \n", attr_name.c_str());
+    printf("check_data_complex_1, dump attr %s \n", attr_name.c_str());
 #endif    
     for(int i = 0; i < length; ++i) {
         double inl = static_cast<double>(pinline[i]);
