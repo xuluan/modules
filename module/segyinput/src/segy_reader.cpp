@@ -784,8 +784,9 @@ bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
 
     // Calculate file position for this trace
     // SEGY format: 3200 byte textual header + 400 byte binary header + traces
-    int64_t traceStartOffset = 3600 + trace_num * m_fileInfo.traceByteSize + 240;
-    
+    int64_t traceStartOffset = SEGY::TextualFileHeaderSize + SEGY::BinaryFileHeaderSize 
+                + trace_num * m_fileInfo.traceByteSize + SEGY::TraceHeaderSize;
+
     file.seekg(traceStartOffset);
     if (!file.good()) {
         m_lastError = "Failed to seek to trace position";
@@ -821,8 +822,7 @@ bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
                 // 32-bit integer
                 int32_t* intData = reinterpret_cast<int32_t*>(data);
                 for (int i = 0; i < m_fileInfo.sampleCount; i++) {
-                    int32_t value = ntohl(intData[i]);
-                    intData[i] = static_cast<float>(value);
+                    intData[i] = ntohl(intData[i]);
                 }
                 break;
             }
@@ -1230,7 +1230,8 @@ bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, 
             // Read trace header
             // Calculate file position for this trace
             // SEGY format: 3200 byte textual header + 400 byte binary header + traces
-            int64_t traceStartOffset = 3600 + traceNum * m_fileInfo.traceByteSize;
+            int64_t traceStartOffset = SEGY::TextualFileHeaderSize + SEGY::BinaryFileHeaderSize
+                     + traceNum * m_fileInfo.traceByteSize;
             
             file.seekg(traceStartOffset);
             if (!file.good()) {
