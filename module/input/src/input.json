@@ -1,5 +1,5 @@
 "name": "input",
-"version": "1.0.0",
+"version": "1.0.2",
 "use_mpi": false,
 "use_cuda": false,
 "url": {
@@ -13,7 +13,7 @@
   "filefilter": "*.vds"
 },
 "sliceposition":{
-  "type": "argument",
+  "type": "choice",
   "required": false,
   "help": "Indicate on which axis to read the slice. By default, get slices on primary key. Possible values are 'on_primary_key', 'on_secondary_key', and 'on_data_samples'",
   "format": "text",

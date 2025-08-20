@@ -11,6 +11,35 @@
 #include <unistd.h>
 #include "gdlogger_capi.h"
 
+enum VSDataFormat get_vsdataformat(enum AttributeFormat attr_fmt)
+{
+  enum VSDataFormat ret;
+  switch (attr_fmt) {
+    case FORMAT_U8:
+      ret = VSFORMAT_U8;
+      break;
+    case FORMAT_U16:
+      ret = VSFORMAT_U16;
+      break;
+    case FORMAT_U32:
+      ret = VSFORMAT_U32;
+      break;
+    case FORMAT_U64:
+      ret = VSFORMAT_U64;
+      break;
+    case FORMAT_R32:
+      ret = VSFORMAT_R32;
+      break;
+    case FORMAT_R64:
+      ret = VSFORMAT_R64;
+      break;
+    default:
+      ret = VSFORMAT_ANY;
+  }
+
+  return ret;
+}
+
   
 void output_init(const char* myid, const char* buf)
 {
@@ -95,8 +124,8 @@ void output_init(const char* myid, const char* buf)
   if (!VS_add_volume_attribute(vsid, VSFORMAT_R32, 1, 
                           DF_get_volume_data_name(),
                           "",
-                          0.f,
-                          0.f)) {
+                          -1.f,
+                          1.f)) {
     LOG_error(my_logger, "Failed to add volume attribute %s\n", DF_get_volume_data_name());
     DF_set_job_aborted();
     return;
@@ -108,6 +137,8 @@ void output_init(const char* myid, const char* buf)
   const char* attr_name;
   struct AttributeInfo attr_info;
   LOG_debug(my_logger, "num_attrs = %d", num_attrs);
+  enum VSDataFormat attr_vsfmt;
+  float val_min, val_max;
   for (i = 0; i < num_attrs; ++i) {
     attr_name = DF_get_attribute_name(i);
 
@@ -126,23 +157,31 @@ void output_init(const char* myid, const char* buf)
     DF_get_attribute_info(attr_name, &attr_info);
     LOG_info(my_logger, "Adding attribute %s to %s", attr_name, my_data->data_url );
 
+    const char* attr_unit = DF_get_attribute_unit(attr_name);
+    LOG_debug(my_logger, "Attribute %s, unit: %s", attr_name, attr_unit);
+
+    attr_vsfmt = get_vsdataformat(attr_info.format);
+
+    // Get value range
+    DF_get_attribute_value_range(attr_name, &val_min, &val_max);
+
     if (attr_info.length == DF_get_data_vector_length()) {
-      if (!VS_add_volume_attribute(vsid, VSFORMAT_R32, 1, 
+      if (!VS_add_volume_attribute(vsid, attr_vsfmt, 1, 
                                    attr_name,
-                                   "",
-                                   0.f,
-                                   0.f)) {
+                                   attr_unit,
+                                   val_min,
+                                   val_max)) {
         LOG_error(my_logger, "Failed to add volume attribute %s\n", attr_name);
         DF_set_job_aborted();
         return;
       }
     }
     else {
-      if (!VS_add_trace_attribute(vsid, VSFORMAT_R32, 1, 
+      if (!VS_add_trace_attribute(vsid, attr_vsfmt, 1, 
                                   attr_name,
                                   "",
-                                  0.f,
-                                  0.f,
+                                  val_min ,
+                                  val_max,
                                   attr_info.length)) {
         LOG_error(my_logger, "Failed to add volume attribute %s\n", attr_name);
         DF_set_job_aborted();
@@ -176,8 +215,15 @@ void output_process(const char* myid)
   void* my_logger = my_data->logger;
 
   if (DF_job_finished()) {
+    VS_close(vsid);
+    if (VS_has_error(vsid)) {
+     LOG_error(my_logger, "Failed to call VS_close"); 
+    }
+    else{
+      LOG_info(my_logger, "Output VDS dataset: %s", my_data->data_url);
+    }
+
     VS_finish(vsid);
-    LOG_info(my_logger, "Output VDS dataset: %s", my_data->data_url);
     LOG_flush_log(my_logger, 100);
     return;
   }
@@ -198,12 +244,19 @@ void output_process(const char* myid)
 
 
   size_t i;
-  int attr_channel_id;
   void* attr_data;
   size_t buf_bytesize;
   int attr_bytesize;
   int grp_size = DF_get_group_size();
-#if 1
+
+  // get environment variable for writing method
+  bool use_chunks = false;
+  const char* env_val = getenv("VDSSTORE_USE_CHUNKS");
+  if (env_val != NULL && strcmp(env_val, "yes") == 0) {
+    use_chunks = true;
+  }
+
+#if 0
   const char* attr_name;
   int num_attrs = DF_get_num_attributes();
   LOG_debug(my_logger, "num_attrs = %d, grp_size = %d", num_attrs, grp_size);
@@ -216,28 +269,41 @@ void output_process(const char* myid)
     if (attr_data == NULL) {
       continue;
     }
-    attr_channel_id = VS_get_attribute_channel_id(vsid, attr_name);
     buf_bytesize = grp_size * DF_get_attribute_byte_size(attr_name); 
   
     LOG_info(my_logger, "Saving attribute %s at primary key %d", attr_name, pkey[0]);
-    VS_write_attribute_slice(vsid, attr_channel_id, 2, pkey_index, attr_data, buf_bytesize);
+    VS_write_attribute_slice(vsid, attr_name, 2, pkey_index, attr_data, buf_bytesize);
   }
 #endif
-#if 0
+#if 1
   char attr_name[256];
   int num_attrs = VS_get_number_attributes(vsid);
   LOG_debug(my_logger, "num_attrs = %d, grp_size = %d", num_attrs, grp_size);
+  char error_msg[1024];
   for (i = 0; i < num_attrs; ++i) {
     VS_get_attribute_name(vsid, i, attr_name);
     attr_data = DF_get_writable_buffer(attr_name);
     if (attr_data == NULL) {
       continue;
     }
-    attr_channel_id = VS_get_attribute_channel_id(vsid, attr_name);
+    
+    int attr_channel_id = VS_get_attribute_channel_id(vsid, attr_name);
     buf_bytesize = grp_size * DF_get_attribute_byte_size(attr_name); 
   
-    LOG_info(my_logger, "Saving attribute %s at primary key %d", attr_name, pkey[0]);
-    VS_write_attribute_slice(vsid, attr_channel_id, 2, pkey_index, attr_data, buf_bytesize);
+    LOG_info(my_logger, "Saving attribute %s at primary key %d, pkey_index=%d, attr_channel_id=%d, buf_bytesize=%d", 
+             attr_name, pkey[0], pkey_index, attr_channel_id, buf_bytesize);
+    if (use_chunks) {
+      VS_write_attribute_slice_by_chunks(vsid, attr_name, 2, pkey_index, attr_data, buf_bytesize);
+    }
+    else {
+      VS_write_attribute_slice(vsid, attr_name, 2, pkey_index, attr_data, buf_bytesize);
+    }
+
+
+    if (VS_has_error(vsid)) {
+      VS_error_message(vsid, error_msg);
+      LOG_error("Failed to write slice of attribute %s at pkey %d. Error: %s", attr_name, pkey[0], error_msg); 
+    }
   }
 #endif
 }

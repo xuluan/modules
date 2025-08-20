@@ -138,7 +138,16 @@ void gendata_init(const char* myid, const char* buf)
   };
 
   // parse job parameters
-  mc::ModuleConfig mod_conf = mc::ModuleConfig {};  mod_conf.Parse(buf);
+  mc::ModuleConfig mod_conf {};  
+  mod_conf.Parse(buf);
+  if(mod_conf.HasError()) {
+    gd_logger.LogError(my_logger, "Failed to parse the job setup. Error: {}", 
+                       mod_conf.ErrorMessage());
+    job_df.SetJobAborted();
+    _clean_up();
+    return;
+  }
+  
   my_data->max_time = mod_conf.GetInt("gendata.maxtime");
   if(mod_conf.HasError()) {
     gd_logger.LogError(my_logger, "Failed to get maxtime. Error: {}", 
@@ -281,7 +290,9 @@ void gendata_init(const char* myid, const char* buf)
   // This way, we can check the data formats of the attributes. Only interger 
   // attributes can be used as keys
   job_df.AddAttribute(my_data->pkey_name.c_str(), as::DataFormat::FORMAT_U32, 1);
+  job_df.SetAttributeValueRange(my_data->pkey_name.c_str(), my_data->fpkey, my_data->lpkey);
   job_df.AddAttribute(my_data->skey_name.c_str(), as::DataFormat::FORMAT_U32, 1);
+  job_df.SetAttributeValueRange(my_data->skey_name.c_str(), my_data->fskey, my_data->lskey);
 
   job_df.SetPrimaryKeyName(my_data->pkey_name.c_str());
   job_df.SetSecondaryKeyName(my_data->skey_name.c_str());
@@ -290,6 +301,7 @@ void gendata_init(const char* myid, const char* buf)
   job_df.AddAttribute(my_data->trace_name.c_str(), 
                       as::DataFormat::FORMAT_R32, 
                       my_data->trace_length);
+  job_df.SetAttributeValueRange(my_data->trace_name.c_str(), -1.f, 1.f);
   job_df.SetVolumeDataName(my_data->trace_name.c_str());
 
   job_df.SetDataAxisUnit("ms");

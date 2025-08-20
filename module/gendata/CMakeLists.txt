@@ -47,5 +47,7 @@ install(TARGETS
 
 install(FILES
   src/gendata.json
+  README.md
+  CHANGELOG.md
   DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

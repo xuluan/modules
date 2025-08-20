@@ -31,7 +31,15 @@ void input_init(const char* myid, const char* buf)
   };
 
   // parse job parameters
-  mc::ModuleConfig mod_conf = mc::ModuleConfig {};  mod_conf.Parse(buf);
+  mc::ModuleConfig mod_conf {};  
+  mod_conf.Parse(buf);
+  if(mod_conf.HasError()) {
+    gd_logger.LogError(my_logger, "Failed to parse the job setup. Error: {}", mod_conf.ErrorMessage().c_str());
+    job_df.SetJobAborted();
+    _clean_up();
+    return;
+  }
+
   mod_conf.GetText("input.url", my_data->data_url);
   if(mod_conf.HasError()) {
     gd_logger.LogError(my_logger, "Failed to get input data url. Error: {}", mod_conf.ErrorMessage().c_str());
@@ -209,8 +217,11 @@ void input_init(const char* myid, const char* buf)
     }
 
     std::string attr_unit = pvs->GetAttributeUnit(i);
-
     job_df.SetAttributeUnit(attr_name.c_str(), attr_unit.c_str());
+    
+    float val_min, val_max;
+    pvs->GetAttributeValueRange(attr_name, val_min, val_max);
+    job_df.SetAttributeValueRange(attr_name.c_str(), val_min, val_max);
   }
   
   // set up data axis
@@ -220,6 +231,8 @@ void input_init(const char* myid, const char* buf)
   pvs->GetAxisInfo(data_dim, trace_name, trace_unit, trace_length, 
                    time_min,
                    time_max);
+  float trc_val_min, trc_val_max;
+  pvs->GetAttributeValueRange(trace_name.c_str(), trc_val_min, trc_val_max);
 
   job_df.SetVolumeDataName(trace_name.c_str());
   job_df.SetDataAxisUnit(trace_unit.c_str());
@@ -250,11 +263,13 @@ void input_init(const char* myid, const char* buf)
     << "ID" << "Name" << "Format" << "Length" << "Min" << "Max" << fort::endr
     << 1 << pkey_name << fmt_string[pkey_name] << 1 << pkey_min << pkey_max << fort::endr
     << 2 << skey_name << fmt_string[skey_name] << 1 << skey_min << skey_max << fort::endr
-    << 3 << trace_name << fmt_string[trace_name] << trace_length << time_min << time_max << fort::endr;
+    << 3 << trace_name << fmt_string[trace_name] << trace_length << trc_val_min << trc_val_max << fort::endr;
   for (auto i = 1; i < pvs->GetNumberAttributes(); ++i) {
     std::string attr_name = pvs->GetAttributeName(i);
+    float val_min, val_max;
+    pvs->GetAttributeValueRange(attr_name, val_min, val_max);
     attr_table << 3 + i 
-      << attr_name << fmt_string[attr_name] << attr_length[attr_name] << -1.0 << 1.0 << fort::endr;
+      << attr_name << fmt_string[attr_name] << attr_length[attr_name] << val_min << val_max << fort::endr;
   }
 
   attr_table.column(3).set_cell_text_align(fort::text_align::right);
@@ -276,6 +291,7 @@ void input_process(const char* myid)
 
   Input* my_data = static_cast<Input*>(job_df.GetModuleStruct(myid));
   void* my_logger = my_data->logger;
+  ovds::VdsStore* pvs = my_data->vsid;
 
   // A handy function to clean up resources if errors happen, 
   // or job has finished
@@ -286,6 +302,7 @@ void input_process(const char* myid)
   };
 
   if (job_df.JobFinished()) {
+    pvs->Close();
     _clean_up();
     return;
   }
@@ -296,7 +313,6 @@ void input_process(const char* myid)
     job_df.SetJobFinished();
     return;
   }
-  
 
   int grp_size = job_df.GetGroupSize();
 
@@ -325,9 +341,6 @@ void input_process(const char* myid)
   std::copy(my_data->skeys.begin(), 
             my_data->skeys.end(), 
             skey);
-
-
-  ovds::VdsStore* pvs = my_data->vsid;
 
   for (auto i = 0; i < pvs->GetNumberAttributes(); ++i) {
     std::string attr_name = pvs->GetAttributeName(i);

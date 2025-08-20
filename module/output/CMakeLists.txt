@@ -44,6 +44,8 @@ install(TARGETS
 
 install(FILES 
   src/output.json
+  README.md
+  CHANGELOG.md
   DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
