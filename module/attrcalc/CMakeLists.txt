@@ -48,5 +48,7 @@ install(TARGETS
 
 install(FILES
   src/attrcalc.json
+  README.md
+  CHANGELOG.md
   DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
