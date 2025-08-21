@@ -161,17 +161,9 @@ public:
     
     // Get trace number with rectangular assumption and fallback to precise search
     int64_t getTraceNumber(std::ifstream& file,int inlineNum, int crosslineNum);
-
-    // Read trace data for a specific inline/crossline
-    bool readTrace(int inline_num, int crossline_num, std::vector<float>& traceData);
     
     // Read trace data for a specific trace number
     bool readTrace(std::ifstream& file, int64_t trace_num, char *data);
-
-    // Read multiple traces in a region
-    bool readTraceRegion(int inlineStart, int inlineEnd, 
-                        int crosslineStart, int crosslineEnd,
-                        std::vector<float>& volumeData); 
 
     // Read multiple traces by primary index
     bool readTraceByPriIdx(int priIndex, int sndStart, int sndEnd,

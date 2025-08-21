@@ -97,10 +97,15 @@ void segyinput_init(const char* myid, const char* buf)
             my_data->segy_reader.getSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
             my_data->segy_reader.getDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
 
+            gd_logger.LogInfo(my_logger, "getPrimaryKeyAxis {} {} {} {}", my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
+            gd_logger.LogInfo(my_logger, "getSecondaryKeyAxis {} {} {} {}", my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
+            gd_logger.LogInfo(my_logger, "getDataAxis {} {} {} {}", my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
+
             try {
                 int i = segyin_config.at("primary_start", "segyinput").as_int();
                 if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
                     my_data->fpkey = (i - my_data->lpkey)/my_data->pkinc * my_data->pkinc + my_data->lpkey;
+                    gd_logger.LogInfo(my_logger, "my_data->fpkey INPUT: {} UPDATE {}", i, my_data->fpkey);
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
@@ -110,17 +115,19 @@ void segyinput_init(const char* myid, const char* buf)
                 int i = segyin_config.at("primary_end", "segyinput").as_int();
                 if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
                     my_data->lpkey = i;
+                    gd_logger.LogInfo(my_logger, "my_data->lpkey INPUT: {} UPDATE {}", i, my_data->lpkey);
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
             }
 
-            my_data->num_pkey = my_data->lpkey - my_data->fpkey + 1;
+            my_data->num_pkey = (my_data->lpkey - my_data->fpkey)/my_data->pkinc + 1;
 
             try {
                 int i = segyin_config.at("secondary_start", "segyinput").as_int();
                 if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
                     my_data->fskey = i;
+                    gd_logger.LogInfo(my_logger, "my_data->fskey INPUT: {} UPDATE {}", i, my_data->fskey);
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
@@ -130,11 +137,13 @@ void segyinput_init(const char* myid, const char* buf)
                 int i = segyin_config.at("secondary_end", "segyinput").as_int();
                 if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
                     my_data->lskey = i;
+                    gd_logger.LogInfo(my_logger, "my_data->lskey INPUT: {} UPDATE {}", i, my_data->lskey);
+
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
             }
-            my_data->num_skey = my_data->lskey - my_data->fskey + 1;
+            my_data->num_skey = (my_data->lskey - my_data->fskey)/my_data->skinc + 1;
 
             my_data->trace_start = 0;
             my_data->trace_end = my_data->trace_length - 1;
@@ -144,6 +153,7 @@ void segyinput_init(const char* myid, const char* buf)
                 if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
                     my_data->trace_start = i;
                     my_data->tmin = my_data->sinterval/ 1000.0 * i;
+                    gd_logger.LogInfo(my_logger, "my_data->trace_start INPUT: {} UPDATE {}", i, my_data->trace_start);
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
@@ -154,15 +164,20 @@ void segyinput_init(const char* myid, const char* buf)
                 if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
                     my_data->trace_end = i;
                     my_data->tmax = my_data->sinterval/ 1000.0 * i;
-
+                    gd_logger.LogInfo(my_logger, "my_data->trace_end INPUT: {} UPDATE {}", i, my_data->trace_end);
                 }
             } catch (const std::exception& e) {
                 gd_logger.LogDebug(my_logger, e.what());
             }
 
             my_data->trace_length = my_data->trace_end - my_data->trace_start + 1;
+
+            gd_logger.LogInfo(my_logger, "Updated:");
             
-            
+            gd_logger.LogInfo(my_logger, "getPrimaryKeyAxis {} {} {} {}", my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
+            gd_logger.LogInfo(my_logger, "getSecondaryKeyAxis {} {} {} {}", my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
+            gd_logger.LogInfo(my_logger, "getDataAxis {} {} {} {}", my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
+
             my_data->current_pkey = my_data->fpkey;
 
             // Add primary and secondary attribute
