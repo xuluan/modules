@@ -1,21 +1,21 @@
-"name": "segyinput",
+"name": "segyoutput",
 "version": "1.0.0",
 "use_mpi": false,
 "use_cuda": false,
-"url": {
+"output_url": {
   "type": "argument",
   "required": true,
   "format": "text",
   "default": "",
-  "help": "The full path of the segyinput dataset, ie, /full/path/to/the/segyinput_data.segy",
+  "help": "The full path where the SEGY output file will be created, ie, /full/path/to/the/output_data.segy",
   "width": "full",
-  "button": "file",
+  "button": "save-file",
   "filefilter": "*.segy"
 },
 "run_mode":{
   "type": "choice",
   "required": true,
-  "help": "Indicating the operation mode: dry-run: only prints 3200 bytes of the text header (80*40), actual-run: executes the normal SEGY input operation",
+  "help": "Indicating the operation mode: dry-run: validates configuration without creating file, actual-run: executes the normal SEGY output operation",
   "format": "text",
   "default": "actual-run",
   "options": [
@@ -30,12 +30,12 @@
     "format": "text",
     "width": "default",
     "default": "INLINE",
-    "help": "The name of the primary key"
+    "help": "The name of the primary key (usually inline)"
 },
 "primary_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of primary number at trace headers",
+  "help": "the offset of primary number in trace headers (default: 189 for inline)",
   "format": "int",
   "default": "189",
   "width": "default"
@@ -47,12 +47,12 @@
     "format": "text",
     "width": "default",
     "default": "CROSSLINE",
-    "help": "The name of the secondary key"
+    "help": "The name of the secondary key (usually crossline)"
 },
 "secondary_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of crossline number at trace headers",
+  "help": "the offset of crossline number in trace headers (default: 193 for crossline)",
   "format": "int",
   "default": "193",
   "width": "default"
@@ -64,79 +64,80 @@
     "format": "text",
     "width": "default",
     "default": "TRACE",
-    "help": "The name of the data key"
+    "help": "The name of the trace data attribute"
 },
 "sinterval_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of sample interval at binary header",
+  "help": "the offset of sample interval in trace headers (default: 117)",
   "format": "int",
-  "default": "17",
+  "default": "117",
   "width": "default"
 },
 "trace_length_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of trace length at binary header",
+  "help": "the offset of trace length in trace headers (default: 115)",
   "format": "int",
-  "default": "21",
+  "default": "115",
   "width": "default"
 },
 "data_format_code_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of data format code at binary header",
+  "help": "the offset of data format code in trace headers (default: 119)",
   "format": "int",
-  "default": "25",
+  "default": "119",
   "width": "default"
 },
-"primary_start":{
+"textual_header": {
   "type": "argument",
   "required": false,
-  "help": "the start of the primary",
-  "format": "int",
-  "width": "default"
+  "format": "text",
+  "width": "full",
+  "help": "Custom textual header content (3200 characters max). If not provided, automatic header will be generated."
 },
-"primary_end":{
-  "type": "argument",
+"endianness": {
+  "type": "choice",
   "required": false,
-  "help": "the end of the primary",
-  "format": "int",
-  "width": "default"
+  "help": "Byte order for SEGY file: BigEndian (standard SEGY) or LittleEndian",
+  "format": "text",
+  "default": "BigEndian",
+  "options": [
+    "BigEndian",
+    "LittleEndian"
+  ]
 },
-"secondary_start":{
-  "type": "argument",
+"data_format": {
+  "type": "choice",
   "required": false,
-  "help": "the start of the secondary",
-  "format": "int",
-  "width": "default"
+  "help": "SEGY data sample format code. Usually auto-detected from input data.",
+  "format": "text",
+  "default": "auto",
+  "options": [
+    "auto",
+    "int8",
+    "int16", 
+    "int32",
+    "ieee_float"
+  ]
 },
-"secondary_end":{
-  "type": "argument",
+"coordinate_system": {
+  "type": "choice",
   "required": false,
-  "help": "the end of the secondary",
-  "format": "int",
-  "width": "default"
-},
-"trace_start":{
-  "type": "argument",
-  "required": false,
-  "help": "the start number of the trace, default: 0",
-  "format": "int",
-  "width": "default"
-},
-"trace_end":{
-  "type": "argument",
-  "required": false,
-  "help": "the end number of the trace, default: trace_length - 1",
-  "format": "int",
-  "width": "default"
+  "help": "Primary coordinate system: inline_major (inline as primary key) or crossline_major",
+  "format": "text",
+  "default": "inline_major",
+  "options": [
+    "inline_major",
+    "crossline_major"
+  ]
 },
 "attribute": {
   "required": false,
   "repeatable": true,
   "type": "procedure",
-  "help": "the attribute from segy trace headers",
+  "help": "Custom attributes to write to SEGY trace headers",
   "name": {
     "type": "argument",
     "required": true,
@@ -150,7 +151,7 @@
   "required": true,
   "help": "The data type of the current attribute: int8, int16, int32 and float.",
   "format": "text",
-  "default": "float",
+  "default": "int32",
   "options": [
     "int8",
     "int16",
@@ -161,7 +162,7 @@
   "offset": {
     "type": "argument",
     "required": true,
-    "help": "the offset of attribute at trace headers",
+    "help": "the offset of attribute in trace headers (240 bytes)",
     "format": "int"
   }
-
+}

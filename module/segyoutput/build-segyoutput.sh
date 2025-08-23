@@ -55,7 +55,7 @@ if [[ -z ${libdwarf_DIR+x} ]]; then
 fi
 
 cmake -GNinja \
-  -DCMAKE_INSTALL_PREFIX=${GEODELITY_DIR}/module/segyinput/$Version \
+  -DCMAKE_INSTALL_PREFIX=${GEODELITY_DIR}/module/segyoutput/$Version \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DUSE_SHARED_OPENVDS=OFF \

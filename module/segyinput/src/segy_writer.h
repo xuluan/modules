@@ -17,7 +17,7 @@
 #include <GdLogger.h>
 
 // Reuse SEGY structure definitions from reader
-#include "../../segyinput/src/segy_reader.h"
+#include "segy_reader.h"
 
 // Enhanced structure for writing SEGY data
 struct SEGYWriteInfo {

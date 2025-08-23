@@ -1,11 +1,14 @@
-# Segy Input
+# Segy Output
 
 ## Objective
 
-To read data from Segy format file with support for flexible data access and configuration.
+To write data to Segy format file with support for flexible data configuration and customizable headers.
 
 # Key Features
 
-- Supports reading from a specified data address or path
-- Allows attribute range selection, enabling input of data within user-defined low and high limits
-- Allows users to specify the data at specific positions in the trace header as attribute.
+- Supports writing data to a specified output file path
+- Allows configuration of trace header fields and custom attributes
+- Supports multiple data formats (int8, int16, int32, IEEE float)
+- Provides dry-run mode for validation without creating actual files
+- Configurable coordinate system (inline/crossline) mapping
+- Automatic SEGY header generation with proper EBCDIC encoding
