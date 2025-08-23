@@ -1,0 +1,167 @@
+"name": "segyinput",
+"version": "1.0.0",
+"use_mpi": false,
+"use_cuda": false,
+"url": {
+  "type": "argument",
+  "required": true,
+  "format": "text",
+  "default": "",
+  "help": "The full path of the segyinput dataset, ie, /full/path/to/the/segyinput_data.segy",
+  "width": "full",
+  "button": "file",
+  "filefilter": "*.segy"
+},
+"run_mode":{
+  "type": "choice",
+  "required": true,
+  "help": "Indicating the operation mode: dry-run: only prints 3200 bytes of the text header (80*40), actual-run: executes the normal SEGY input operation",
+  "format": "text",
+  "default": "actual-run",
+  "options": [
+    "dry-run",
+    "actual-run"
+  ]
+},
+"primary_name": {
+    "type": "argument",
+    "required": false,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "default": "INLINE",
+    "help": "The name of the primary key"
+},
+"primary_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of primary number at trace headers",
+  "format": "int",
+  "default": "189",
+  "width": "default"
+},
+"secondary_name": {
+    "type": "argument",
+    "required": false,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "default": "CROSSLINE",
+    "help": "The name of the secondary key"
+},
+"secondary_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of crossline number at trace headers",
+  "format": "int",
+  "default": "193",
+  "width": "default"
+},
+"data_name": {
+    "type": "argument",
+    "required": false,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "default": "TRACE",
+    "help": "The name of the data key"
+},
+"sinterval_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of sample interval at binary header",
+  "format": "int",
+  "default": "17",
+  "width": "default"
+},
+"trace_length_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of trace length at binary header",
+  "format": "int",
+  "default": "21",
+  "width": "default"
+},
+"data_format_code_offset":{
+  "type": "argument",
+  "required": false,
+  "help": "the offset of data format code at binary header",
+  "format": "int",
+  "default": "25",
+  "width": "default"
+},
+"primary_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start of the primary",
+  "format": "int",
+  "width": "default"
+},
+"primary_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end of the primary",
+  "format": "int",
+  "width": "default"
+},
+"secondary_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start of the secondary",
+  "format": "int",
+  "width": "default"
+},
+"secondary_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end of the secondary",
+  "format": "int",
+  "width": "default"
+},
+"trace_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start number of the trace, default: 0",
+  "format": "int",
+  "width": "default"
+},
+"trace_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end number of the trace, default: trace_length - 1",
+  "format": "int",
+  "width": "default"
+},
+"attribute": {
+  "required": false,
+  "repeatable": true,
+  "type": "procedure",
+  "help": "the attribute from segy trace headers",
+  "name": {
+    "type": "argument",
+    "required": true,
+    "repetable": false,
+    "format": "text",
+    "width": "default",
+    "help": "Name of the attribute"
+  },
+  "datatype": {
+  "type": "choice",
+  "required": true,
+  "help": "The data type of the current attribute: int8, int16, int32 and float.",
+  "format": "text",
+  "default": "float",
+  "options": [
+    "int8",
+    "int16",
+    "int32",
+    "float"
+  ]
+  },
+  "offset": {
+    "type": "argument",
+    "required": true,
+    "help": "the offset of attribute at trace headers",
+    "format": "int"
+  }
+
