@@ -150,8 +150,15 @@ void segyoutput_init(const char* myid, const char* buf)
         }
 
         my_data->trace_length = my_data->trace_end - my_data->trace_start + 1;
-        my_data->current_pkey = my_data->fpkey;
-        
+        my_data->current_pkey = my_data->fpkey;//todo: implement logic for slice cube
+
+
+        my_data->skeys.clear();
+        for (int i = my_data->fskey; i <= my_data->lskey;) {
+            my_data->skeys.push_back(i);
+            i += my_data->skinc;
+        }
+
         gd_logger.LogInfo(my_logger, "Primary axis: {} to {} ({} values, inc={})", 
                             my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
         gd_logger.LogInfo(my_logger, "Secondary axis: {} to {} ({} values, inc={})", 
@@ -169,7 +176,7 @@ void segyoutput_init(const char* myid, const char* buf)
         try {
             my_data->secondary_offset = segyout_config.at("secondary_offset", "segyoutput").as_int();
         } catch (const std::exception& e) {
-            my_data->primary_offset = 193;
+            my_data->secondary_offset = 193;
         }
 
         try {
