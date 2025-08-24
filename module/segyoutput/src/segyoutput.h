@@ -10,9 +10,7 @@
 
 struct Segyoutput {
     std::string output_url;
-    bool is_dry_run;
-    SEGYWriter* segy_writer;
-    SEGYWriteInfo write_info;
+    SEGYWriter segy_writer;
     
     std::string pkey_name;
     std::string skey_name;
@@ -30,6 +28,8 @@ struct Segyoutput {
     int pkinc;
     int skinc;
     int trace_length;
+    int trace_start;
+    int trace_end;      
     int sinterval;
     float tmin;
     float tmax;

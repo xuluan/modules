@@ -16,8 +16,52 @@
 #include <climits>
 #include <GdLogger.h>
 
-// Reuse SEGY structure definitions from reader
-#include "../../segyinput/src/segy_reader.h"
+// OpenVDS SEGY structure definitions
+namespace SEGY {
+    enum { TextualFileHeaderSize = 3200, BinaryFileHeaderSize = 400, TraceHeaderSize = 240 };
+    
+    enum class Endianness { BigEndian, LittleEndian };
+    
+    enum class DataSampleFormatCode {
+        Unknown = 0, 
+        IBMFloat = 1, 
+        Int32 = 2, 
+        Int16 = 3, 
+        FixedPoint = 4, 
+        IEEEFloat = 5, 
+        IEEEDouble = 6, 
+        Int24 = 7, 
+        Int8 = 8
+    };
+
+    struct HeaderField {
+        int byteLocation;
+        int fieldWidth;
+        DataSampleFormatCode fieldType;
+        
+        HeaderField() : byteLocation(0), fieldWidth(2), fieldType(DataSampleFormatCode::Unknown) {}
+        HeaderField(int loc, int width) : byteLocation(loc), fieldWidth(width), fieldType(DataSampleFormatCode::Unknown) {}
+        HeaderField(int loc, int width, DataSampleFormatCode type) : byteLocation(loc), fieldWidth(width), fieldType(type) {}
+        bool defined() const { return byteLocation != 0; }
+    };
+    
+    // Standard SEGY header field definitions
+    namespace BinaryHeader {
+        const HeaderField SampleIntervalHeaderField(17, 2);
+        const HeaderField NumSamplesHeaderField(21, 2);
+        const HeaderField DataSampleFormatCodeHeaderField(25, 2);
+    }
+    
+    namespace TraceHeader {
+        const HeaderField NumSamplesHeaderField(115, 2);
+        const HeaderField SampleIntervalHeaderField(117, 2);
+        const HeaderField InlineNumberHeaderField(189, 4);
+        const HeaderField CrosslineNumberHeaderField(193, 4);
+    }
+    
+    // OpenVDS-style ReadFieldFromHeader implementation
+    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
+}
 
 // Enhanced structure for writing SEGY data
 struct SEGYWriteInfo {
@@ -26,12 +70,6 @@ struct SEGYWriteInfo {
     int sampleCount;
     int sampleInterval;
     int traceByteSize;
-    
-    SEGY::HeaderField primaryKey;
-    SEGY::HeaderField secondaryKey;
-    SEGY::HeaderField numSamplesKey;
-    SEGY::HeaderField sampleIntervalKey;
-    SEGY::HeaderField dataSampleFormatCodeKey;
     
     // Coordinate system information
     int minInline, maxInline, inlineCount;
@@ -55,9 +93,9 @@ private:
     bool m_fileCreated;
     
     SEGYWriteInfo m_writeInfo;
-    std::map<std::string, SEGY::HeaderField> m_customFields;
+    std::map<std::string, SEGY::HeaderField> m_binaryFields;
     std::map<std::string, std::string> m_fieldAliases;
-    std::map<std::string, SEGY::HeaderField> m_attrFields;
+    std::map<std::string, SEGY::HeaderField> m_traceFields;
     
     gdlog::GdLogger* m_logger;
     void* m_log_data;
@@ -89,21 +127,21 @@ private:
     void generateTraceHeader(SEGYTraceData& traceData);
     
 public:
-    SEGYWriter(SEGYWriteInfo writeInfo);
+    SEGYWriter();
     ~SEGYWriter();
     
     // Configuration methods
     
     // Add custom header field definition
-    void addCustomField(const std::string& name, int byteLocation, int width);
-    
-    // Add custom attribute field definition
-    void addAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
+    void addBinaryField(const std::string& name, int byteLocation, int width);
+
+    // Add custom trace field definition
+    void addTraceField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
 
     // File creation and initialization
     
     // Initialize writer and create output file
-    bool initialize(const std::string& filename);
+    bool initialize(const std::string& filename, SEGYWriteInfo writeInfo);
     
     // Finalize file writing and close
     bool finalize();

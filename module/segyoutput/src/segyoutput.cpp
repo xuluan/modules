@@ -51,151 +51,230 @@ void segyoutput_init(const char* myid, const char* buf)
         if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
             throw std::runtime_error("Error: segyoutput parent directory does not exist: " + parent_dir.string());
         }
-
-        //parse run_mode
-        std::string run_mode = segyout_config.at("run_mode", "segyoutput").as_string();
-        if (run_mode != "dry-run" && run_mode != "actual-run") {
-            throw std::runtime_error("Error: segyoutput run_mode is invalid: " + run_mode);
-        }
       
         gd_logger.LogInfo(my_logger, "segyoutput run_mode: {}", run_mode);
+            
+        // Get data flow information to configure SEGY writer
+        my_data->pkey_name = job_df.GetPrimaryKeyName();
+        my_data->skey_name = job_df.GetSecondaryKeyName();
+        my_data->trace_name = job_df.GetVolumeDataName();
+        
+        gd_logger.LogInfo(my_logger, "Primary key: {}, Secondary key: {}, Trace data: {}", 
+                            my_data->pkey_name, my_data->skey_name, my_data->trace_name);
 
-        if (run_mode == "dry-run") {
-            my_data->is_dry_run = true;
-            
-            // In dry-run mode, just validate configuration and report what would be written
-            gd_logger.LogInfo(my_logger, "Dry-run mode: SEGY output file would be created at: {}", my_data->output_url);
-            
-        } else { // actual-run
-            my_data->is_dry_run = false;
-            
-            // Get data flow information to configure SEGY writer
-            my_data->pkey_name = job_df.GetPrimaryKeyName();
-            my_data->skey_name = job_df.GetSecondaryKeyName();
-            my_data->trace_name = job_df.GetVolumeDataName();
-            
-            gd_logger.LogInfo(my_logger, "Primary key: {}, Secondary key: {}, Trace data: {}", 
-                             my_data->pkey_name, my_data->skey_name, my_data->trace_name);
+        // Get axis information from data flow
+        job_df.GetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey);
+        job_df.GetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey);
+        job_df.GetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length);
+        
+        // Calculate increments
+        my_data->pkinc = (my_data->num_pkey > 1) ? (my_data->lpkey - my_data->fpkey) / (my_data->num_pkey - 1) : 1;
+        my_data->skinc = (my_data->num_skey > 1) ? (my_data->lskey - my_data->fskey) / (my_data->num_skey - 1) : 1;
+        
+        // Get sample interval from data flow
+        my_data->sinterval = static_cast<int>(job_df.GetDataSampleRate() * 1000); // Convert to microseconds
 
-            // Get axis information from data flow
-            job_df.GetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey);
-            job_df.GetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey);
-            job_df.GetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length);
-            
-            // Calculate increments
-            my_data->pkinc = (my_data->num_pkey > 1) ? (my_data->lpkey - my_data->fpkey) / (my_data->num_pkey - 1) : 1;
-            my_data->skinc = (my_data->num_skey > 1) ? (my_data->lskey - my_data->fskey) / (my_data->num_skey - 1) : 1;
-            
-            // Get sample interval from data flow
-            my_data->sinterval = static_cast<int>(job_df.GetDataSampleRate() * 1000); // Convert to microseconds
-            
-            gd_logger.LogInfo(my_logger, "Primary axis: {} to {} ({} values, inc={})", 
-                             my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
-            gd_logger.LogInfo(my_logger, "Secondary axis: {} to {} ({} values, inc={})", 
-                             my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
-            gd_logger.LogInfo(my_logger, "Data axis: {} to {} ({} samples, interval={}μs)", 
-                             my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
-
-            // Parse header field offsets from configuration
-            my_data->primary_offset = segyout_config.at("primary_offset", "segyoutput").as_int();
-            my_data->secondary_offset = segyout_config.at("secondary_offset", "segyoutput").as_int();
-            my_data->sinterval_offset = segyout_config.at("sinterval_offset", "segyoutput").as_int();
-            my_data->trace_length_offset = segyout_config.at("trace_length_offset", "segyoutput").as_int();
-            my_data->data_format_code_offset = segyout_config.at("data_format_code_offset", "segyoutput").as_int();
-
-            // Determine data format from trace attribute
-            as::DataFormat trace_format;
-            int trace_attr_length;
-            float min_val, max_val;
-            job_df.GetAttributeInfo(my_data->trace_name.c_str(), trace_format, trace_attr_length, min_val, max_val);
-            
-            SEGY::DataSampleFormatCode segy_format;
-            switch (trace_format) {
-                case as::DataFormat::FORMAT_U8:
-                    segy_format = SEGY::DataSampleFormatCode::Int8;
-                    break;
-                case as::DataFormat::FORMAT_U16:
-                    segy_format = SEGY::DataSampleFormatCode::Int16;
-                    break;
-                case as::DataFormat::FORMAT_U32:
-                    segy_format = SEGY::DataSampleFormatCode::Int32;
-                    break;
-                case as::DataFormat::FORMAT_R32:
-                    segy_format = SEGY::DataSampleFormatCode::IEEEFloat;
-                    break;
-                default:
-                    throw std::runtime_error("Error: unsupported data format for SEGY output");
+        //update 
+        try {
+            int i = segyout_config.at("primary_start", "segyoutput").as_int();
+            if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
+                my_data->fpkey = (i - my_data->lpkey)/my_data->pkinc * my_data->pkinc + my_data->lpkey;
+                gd_logger.LogInfo(my_logger, "my_data->fpkey INPUT: {} UPDATE {}", i, my_data->fpkey);
             }
-
-            // Configure SEGY write info
-            my_data->write_info.headerEndianness = SEGY::Endianness::Big; // Standard SEGY big-endian
-            my_data->write_info.dataSampleFormatCode = segy_format;
-            my_data->write_info.sampleCount = my_data->trace_length;
-            my_data->write_info.sampleInterval = my_data->sinterval;
-            
-            // Calculate trace byte size based on format
-            int sample_size = 0;
-            switch (segy_format) {
-                case SEGY::DataSampleFormatCode::Int8:
-                    sample_size = 1;
-                    break;
-                case SEGY::DataSampleFormatCode::Int16:
-                    sample_size = 2;
-                    break;
-                case SEGY::DataSampleFormatCode::Int32:
-                case SEGY::DataSampleFormatCode::IEEEFloat:
-                    sample_size = 4;
-                    break;
-                default:
-                    throw std::runtime_error("Error: unsupported SEGY data format");
-            }
-            my_data->write_info.traceByteSize = my_data->trace_length * sample_size;
-            
-            // Set coordinate system
-            my_data->write_info.minInline = my_data->fpkey;
-            my_data->write_info.maxInline = my_data->lpkey;
-            my_data->write_info.inlineCount = my_data->num_pkey;
-            my_data->write_info.minCrossline = my_data->fskey;
-            my_data->write_info.maxCrossline = my_data->lskey;
-            my_data->write_info.crosslineCount = my_data->num_skey;
-            my_data->write_info.primaryStep = my_data->pkinc;
-            my_data->write_info.secondaryStep = my_data->skinc;
-            my_data->write_info.isPrimaryInline = true; // Assume inline is primary
-            
-            // Set header field locations
-            my_data->write_info.primaryKey = {my_data->primary_offset, 4, true};
-            my_data->write_info.secondaryKey = {my_data->secondary_offset, 4, true};
-            my_data->write_info.numSamplesKey = {my_data->trace_length_offset, 2, true};
-            my_data->write_info.sampleIntervalKey = {my_data->sinterval_offset, 2, true};
-            my_data->write_info.dataSampleFormatCodeKey = {my_data->data_format_code_offset, 2, true};
-
-            // Set textual header content
-            my_data->write_info.textualHeaderContent = "C01 SEGY file created by segyoutput module\n";
-            my_data->write_info.textualHeaderContent += "C02 Inline range: " + std::to_string(my_data->fpkey) + " - " + std::to_string(my_data->lpkey) + "\n";
-            my_data->write_info.textualHeaderContent += "C03 Crossline range: " + std::to_string(my_data->fskey) + " - " + std::to_string(my_data->lskey) + "\n";
-            my_data->write_info.textualHeaderContent += "C04 Sample count: " + std::to_string(my_data->trace_length) + "\n";
-            my_data->write_info.textualHeaderContent += "C05 Sample interval: " + std::to_string(my_data->sinterval) + " microseconds\n";
-
-            // Calculate total expected traces
-            my_data->total_expected_traces = static_cast<int64_t>(my_data->num_pkey) * my_data->num_skey;
-            
-            // Create SEGY writer
-            my_data->segy_writer = new SEGYWriter(my_data->write_info);
-            
-            // Initialize the writer and create output file
-            if (!my_data->segy_writer->initialize(my_data->output_url)) {
-                throw std::runtime_error("Error: failed to initialize SEGY writer for file: " + my_data->output_url + 
-                                       ", Error: " + my_data->segy_writer->getLastError());
-            }
-            
-            my_data->file_initialized = true;
-            my_data->header_written = true;
-            my_data->current_pkey = my_data->fpkey;
-            
-            gd_logger.LogInfo(my_logger, "SEGY writer initialized successfully");
-            gd_logger.LogInfo(my_logger, "Expected total traces: {}", my_data->total_expected_traces);
-            gd_logger.LogInfo(my_logger, "Expected file size: {} bytes", my_data->segy_writer->getExpectedFileSize());
+        } catch (const std::exception& e) {
+            gd_logger.LogDebug(my_logger, e.what());
         }
+
+        try {
+            int i = segyout_config.at("primary_end", "segyoutput").as_int();
+            if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
+                my_data->lpkey = i;
+                gd_logger.LogInfo(my_logger, "my_data->lpkey INPUT: {} UPDATE {}", i, my_data->lpkey);
+            }
+        } catch (const std::exception& e) {
+            gd_logger.LogDebug(my_logger, e.what());
+        }
+
+        my_data->num_pkey = (my_data->lpkey - my_data->fpkey)/my_data->pkinc + 1;
+
+        try {
+            int i = segyout_config.at("secondary_start", "segyoutput").as_int();
+            if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
+                my_data->fskey = i;
+                gd_logger.LogInfo(my_logger, "my_data->fskey INPUT: {} UPDATE {}", i, my_data->fskey);
+            }
+        } catch (const std::exception& e) {
+            gd_logger.LogDebug(my_logger, e.what());
+        }
+
+        try {
+            int i = segyout_config.at("secondary_end", "segyoutput").as_int();
+            if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
+                my_data->lskey = i;
+                gd_logger.LogInfo(my_logger, "my_data->lskey INPUT: {} UPDATE {}", i, my_data->lskey);
+
+            }
+        } catch (const std::exception& e) {
+            gd_logger.LogDebug(my_logger, e.what());
+        }
+        my_data->num_skey = (my_data->lskey - my_data->fskey)/my_data->skinc + 1;
+
+        my_data->trace_start = 0;
+        my_data->trace_end = my_data->trace_length - 1;
+
+        try {
+            int i = segyout_config.at("trace_start", "segyoutput").as_int();
+            if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
+                my_data->trace_start = i;
+                my_data->tmin += my_data->sinterval/ 1000.0 * i;
+                gd_logger.LogInfo(my_logger, "my_data->trace_start INPUT: {} UPDATE {}", i, my_data->trace_start);
+            }
+        } catch (const std::exception& e) {
+            gd_logger.LogDebug(my_logger, e.what());
+        }
+
+        try {
+            int i = segyout_config.at("trace_end", "segyoutput").as_int();
+            if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
+                my_data->trace_end = i;
+                my_data->tmax = my_data->tmin + (my_data->sinterval/ 1000.0 )*(i - my_data->trace_start);
+                gd_logger.LogInfo(my_logger, "my_data->trace_end INPUT: {} UPDATE {}", i, my_data->trace_end);
+            }
+        } catch (const std::exception& e) {
+            gd_logger.LogDebug(my_logger, e.what());
+        }
+
+        my_data->trace_length = my_data->trace_end - my_data->trace_start + 1;
+        my_data->current_pkey = my_data->fpkey;
+        
+        gd_logger.LogInfo(my_logger, "Primary axis: {} to {} ({} values, inc={})", 
+                            my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
+        gd_logger.LogInfo(my_logger, "Secondary axis: {} to {} ({} values, inc={})", 
+                            my_data->fskey, my_data->lskey, my_data->num_skey, my_data->skinc);
+        gd_logger.LogInfo(my_logger, "Data axis: {} to {} ({} samples, interval={}μs)", 
+                            my_data->tmin, my_data->tmax, my_data->trace_length, my_data->sinterval);
+
+        // Parse header field offsets from configuration
+        try {
+            my_data->primary_offset = segyout_config.at("primary_offset", "segyoutput").as_int();
+        } catch (const std::exception& e) {
+            my_data->primary_offset = 189;
+        }
+
+        try {
+            my_data->secondary_offset = segyout_config.at("secondary_offset", "segyoutput").as_int();
+        } catch (const std::exception& e) {
+            my_data->primary_offset = 193;
+        }
+
+        try {
+            my_data->sinterval_offset = segyout_config.at("sinterval_offset", "segyoutput").as_int();
+        } catch (const std::exception& e) {
+            my_data->sinterval_offset = 17;
+        }
+
+        try {
+            my_data->trace_length_offset = segyout_config.at("trace_length_offset", "segyoutput").as_int();
+        } catch (const std::exception& e) {
+                my_data->trace_length_offset = 21;
+        }
+
+        try {
+            my_data->data_format_code_offset = segyout_config.at("data_format_code_offset", "segyoutput").as_int();
+        } catch (const std::exception& e) {
+            my_data->data_format_code_offset = 25;
+        }
+
+        // Determine data format from trace attribute
+        as::DataFormat trace_format;
+        int trace_attr_length;
+        float min_val, max_val;
+        job_df.GetAttributeInfo(my_data->trace_name.c_str(), trace_format, trace_attr_length, min_val, max_val);
+        
+        SEGY::DataSampleFormatCode segy_format;
+        switch (trace_format) {
+            case as::DataFormat::FORMAT_U8:
+                segy_format = SEGY::DataSampleFormatCode::Int8;
+                break;
+            case as::DataFormat::FORMAT_U16:
+                segy_format = SEGY::DataSampleFormatCode::Int16;
+                break;
+            case as::DataFormat::FORMAT_U32:
+                segy_format = SEGY::DataSampleFormatCode::Int32;
+                break;
+            case as::DataFormat::FORMAT_R32:
+                segy_format = SEGY::DataSampleFormatCode::IEEEFloat;
+                break;
+            default:
+                throw std::runtime_error("Error: unsupported data format for SEGY output");
+        }
+        SEGYWriteInfo write_info;
+
+        // Configure SEGY write info
+        write_info.headerEndianness = SEGY::Endianness::Big; // Standard SEGY big-endian
+        write_info.dataSampleFormatCode = segy_format;
+        write_info.sampleCount = my_data->trace_length;
+        my_data->write_info.sampleInterval = my_data->sinterval;
+        
+        // Calculate trace byte size based on format
+        int sample_size = 0;
+        switch (segy_format) {
+            case SEGY::DataSampleFormatCode::Int8:
+                sample_size = 1;
+                break;
+            case SEGY::DataSampleFormatCode::Int16:
+                sample_size = 2;
+                break;
+            case SEGY::DataSampleFormatCode::Int32:
+            case SEGY::DataSampleFormatCode::IEEEFloat:
+                sample_size = 4;
+                break;
+            default:
+                throw std::runtime_error("Error: unsupported SEGY data format");
+        }
+        write_info.traceByteSize = my_data->trace_length * sample_size;
+
+        // Set coordinate system
+        write_info.minInline = my_data->fpkey;
+        write_info.maxInline = my_data->lpkey;
+        write_info.inlineCount = my_data->num_pkey;
+        write_info.minCrossline = my_data->fskey;
+        write_info.maxCrossline = my_data->lskey;
+        write_info.crosslineCount = my_data->num_skey;
+        write_info.primaryStep = my_data->pkinc;
+        write_info.secondaryStep = my_data->skinc;
+        write_info.isPrimaryInline = true; // Assume inline is primary
+        
+        // Set header field locations
+        write_info.primaryKey = {my_data->primary_offset, 4, true};
+        write_info.secondaryKey = {my_data->secondary_offset, 4, true};
+        write_info.numSamplesKey = {my_data->trace_length_offset, 2, true};
+        write_info.sampleIntervalKey = {my_data->sinterval_offset, 2, true};
+        write_info.dataSampleFormatCodeKey = {my_data->data_format_code_offset, 2, true};
+
+        // Set textual header content
+        write_info.textualHeaderContent = "C01 SEGY file created by segyoutput module\n";
+        write_info.textualHeaderContent += "C02 Inline range: " + std::to_string(my_data->fpkey) + " - " + std::to_string(my_data->lpkey) + "\n";
+        write_info.textualHeaderContent += "C03 Crossline range: " + std::to_string(my_data->fskey) + " - " + std::to_string(my_data->lskey) + "\n";
+        write_info.textualHeaderContent += "C04 Sample count: " + std::to_string(my_data->trace_length) + "\n";
+        write_info.textualHeaderContent += "C05 Sample interval: " + std::to_string(my_data->sinterval) + " microseconds\n";
+
+        // Calculate total expected traces
+        my_data->total_expected_traces = static_cast<int64_t>(my_data->num_pkey) * my_data->num_skey;
+        
+        // Initialize the writer and create output file
+        if (!my_data->segy_writer.initialize(my_data->output_url, write_info)) {
+            throw std::runtime_error("Error: failed to initialize SEGY writer for file: " + my_data->output_url + 
+                                    ", Error: " + my_data->segy_writer.getLastError());
+        }
+        
+        my_data->file_initialized = true;
+        my_data->header_written = true;
+        
+        gd_logger.LogInfo(my_logger, "SEGY writer initialized successfully");
+        gd_logger.LogInfo(my_logger, "Expected total traces: {}", my_data->total_expected_traces);
+        gd_logger.LogInfo(my_logger, "Expected file size: {} bytes", my_data->segy_writer->getExpectedFileSize());
+
             
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
 
@@ -225,13 +304,6 @@ void segyoutput_process(const char* myid)
 
     if (job_df.JobFinished()) {
         _clean_up();
-        return;
-    }
-
-    if(my_data->is_dry_run) {
-        // In dry-run mode, just log what would be processed and finish
-        gd_logger.LogInfo(my_logger, "Dry-run: would process data and write to SEGY file");
-        job_df.SetJobFinished();
         return;
     }
 

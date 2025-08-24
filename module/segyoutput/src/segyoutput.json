@@ -12,26 +12,6 @@
   "button": "save-file",
   "filefilter": "*.segy"
 },
-"run_mode":{
-  "type": "choice",
-  "required": true,
-  "help": "Indicating the operation mode: dry-run: validates configuration without creating file, actual-run: executes the normal SEGY output operation",
-  "format": "text",
-  "default": "actual-run",
-  "options": [
-    "dry-run",
-    "actual-run"
-  ]
-},
-"primary_name": {
-    "type": "argument",
-    "required": false,
-    "repetable": false,
-    "format": "text",
-    "width": "default",
-    "default": "INLINE",
-    "help": "The name of the primary key (usually inline)"
-},
 "primary_offset":{
   "type": "argument",
   "required": false,
@@ -40,15 +20,6 @@
   "default": "189",
   "width": "default"
 },
-"secondary_name": {
-    "type": "argument",
-    "required": false,
-    "repetable": false,
-    "format": "text",
-    "width": "default",
-    "default": "CROSSLINE",
-    "help": "The name of the secondary key (usually crossline)"
-},
 "secondary_offset":{
   "type": "argument",
   "required": false,
@@ -56,15 +27,6 @@
   "format": "int",
   "default": "193",
   "width": "default"
-},
-"data_name": {
-    "type": "argument",
-    "required": false,
-    "repetable": false,
-    "format": "text",
-    "width": "default",
-    "default": "TRACE",
-    "help": "The name of the trace data attribute"
 },
 "sinterval_offset":{
   "type": "argument",
@@ -97,41 +59,47 @@
   "width": "full",
   "help": "Custom textual header content (3200 characters max). If not provided, automatic header will be generated."
 },
-"endianness": {
-  "type": "choice",
+"primary_start":{
+  "type": "argument",
   "required": false,
-  "help": "Byte order for SEGY file: BigEndian (standard SEGY) or LittleEndian",
-  "format": "text",
-  "default": "BigEndian",
-  "options": [
-    "BigEndian",
-    "LittleEndian"
-  ]
+  "help": "the start of the primary",
+  "format": "int",
+  "width": "default"
 },
-"data_format": {
-  "type": "choice",
+"primary_end":{
+  "type": "argument",
   "required": false,
-  "help": "SEGY data sample format code. Usually auto-detected from input data.",
-  "format": "text",
-  "default": "auto",
-  "options": [
-    "auto",
-    "int8",
-    "int16", 
-    "int32",
-    "ieee_float"
-  ]
+  "help": "the end of the primary",
+  "format": "int",
+  "width": "default"
 },
-"coordinate_system": {
-  "type": "choice",
+"secondary_start":{
+  "type": "argument",
   "required": false,
-  "help": "Primary coordinate system: inline_major (inline as primary key) or crossline_major",
-  "format": "text",
-  "default": "inline_major",
-  "options": [
-    "inline_major",
-    "crossline_major"
-  ]
+  "help": "the start of the secondary",
+  "format": "int",
+  "width": "default"
+},
+"secondary_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end of the secondary",
+  "format": "int",
+  "width": "default"
+},
+"trace_start":{
+  "type": "argument",
+  "required": false,
+  "help": "the start number of the trace, default: 0",
+  "format": "int",
+  "width": "default"
+},
+"trace_end":{
+  "type": "argument",
+  "required": false,
+  "help": "the end number of the trace, default: trace_length - 1",
+  "format": "int",
+  "width": "default"
 },
 "attribute": {
   "required": false,

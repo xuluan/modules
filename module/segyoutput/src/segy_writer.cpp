@@ -45,8 +45,8 @@ namespace SEGY {
     }
 }
 
-SEGYWriter::SEGYWriter(SEGYWriteInfo writeInfo) 
-    : m_writeInfo(writeInfo), m_initialized(false), m_fileCreated(false), m_log_data(nullptr) {
+SEGYWriter::SEGYWriter() 
+    : m_initialized(false), m_fileCreated(false), m_log_data(nullptr) {
     
     m_logger = &gdlog::GdLogger::GetInstance();
     m_log_data = m_logger->Init("SEGYWriter");
@@ -58,25 +58,26 @@ SEGYWriter::~SEGYWriter() {
     }
 }
 
-void SEGYWriter::addCustomField(const std::string& name, int byteLocation, int width) {
+void SEGYWriter::addBinaryField(const std::string& name, int byteLocation, int width) {
     SEGY::HeaderField field;
     field.byteLocation = byteLocation;
     field.width = width;
     field.isSigned = true; // Default to signed
-    m_customFields[name] = field;
+    m_binaryFields[name] = field;
 }
 
-void SEGYWriter::addAttrField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
+void SEGYWriter::addTraceField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
     SEGY::HeaderField field;
     field.byteLocation = byteLocation;
     field.width = width;
     field.isSigned = true;
-    m_attrFields[name] = field;
+    m_traceFields[name] = field;
 }
 
-bool SEGYWriter::initialize(const std::string& filename) {
+bool SEGYWriter::initialize(const std::string& filename, SEGYWriteInfo writeInfo) {
     m_filename = filename;
-    
+    m_writeInfo = writeInfo;
+
     try {
         // Open output file in binary mode
         m_outputFile.open(filename, std::ios::binary | std::ios::out | std::ios::trunc);
