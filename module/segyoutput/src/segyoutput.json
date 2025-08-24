@@ -31,25 +31,25 @@
 "sinterval_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of sample interval in trace headers (default: 117)",
+  "help": "the offset of sample interval in trace headers (default: 17)",
   "format": "int",
-  "default": "117",
+  "default": "17",
   "width": "default"
 },
 "trace_length_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of trace length in trace headers (default: 115)",
+  "help": "the offset of trace length in trace headers (default: 21)",
   "format": "int",
-  "default": "115",
+  "default": "21",
   "width": "default"
 },
 "data_format_code_offset":{
   "type": "argument",
   "required": false,
-  "help": "the offset of data format code in trace headers (default: 119)",
+  "help": "the offset of data format code in trace headers (default: 25)",
   "format": "int",
-  "default": "119",
+  "default": "25",
   "width": "default"
 },
 "textual_header": {

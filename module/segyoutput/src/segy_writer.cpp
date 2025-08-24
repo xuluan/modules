@@ -100,6 +100,10 @@ bool SEGYWriter::initialize(const std::string& filename, SEGYWriteInfo writeInfo
             // Write empty trace headers and data
             std::vector<char> emptyTraceHeader(traceSize, 0);
             file.write(emptyTraceHeader.data(), traceSize);
+            if (file.fail()) {
+                m_lastError = "Failed to write empty trace at index: " + std::to_string(i);
+                return false;
+            }            
         }
 
         m_initialized = true;
@@ -342,7 +346,8 @@ void SEGYWriter::convertSampleDataForWriting(char* data) {
 }
 
 int64_t SEGYWriter::calculateFilePosition(int inlineNum, int crosslineNum) {
-    int64_t count = inlineNum * m_writeInfo.crosslineCount + crosslineNum;
+    int idx = (inlineNum - m_writeInfo.minInline) / primaryStep;
+    int64_t count =  idx * m_writeInfo.crosslineCount + crosslineNum;
     int traceSize = 240 + m_writeInfo.traceByteSize;
 
     return count * traceSize;
