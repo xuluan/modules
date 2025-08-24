@@ -346,8 +346,9 @@ void SEGYWriter::convertSampleDataForWriting(char* data) {
 }
 
 int64_t SEGYWriter::calculateFilePosition(int inlineNum, int crosslineNum) {
-    int idx = (inlineNum - m_writeInfo.minInline) / primaryStep;
-    int64_t count =  idx * m_writeInfo.crosslineCount + crosslineNum;
+    int inline_idx = (inlineNum - m_writeInfo.minInline) / m_writeInfo.primaryStep;
+    int crossline_idx = (crosslineNum - m_writeInfo.minCrossline) / m_writeInfo.secondaryStep;
+    int64_t count =  inline_idx * m_writeInfo.crosslineCount + crossline_idx;
     int traceSize = 240 + m_writeInfo.traceByteSize;
 
     return count * traceSize;
