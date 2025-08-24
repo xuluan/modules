@@ -109,23 +109,21 @@ private:
     void generateBinaryHeader(std::vector<char>& binaryHeader);
     
     // Write textual header (3200 bytes) to file
-    bool writeTextualHeader();
+    bool writeTextualHeader(std::ofstream& file);
     
     // Write binary header (400 bytes) to file
-    bool writeBinaryHeader();
+    bool writeBinaryHeader(std::ofstream& file);
     
     // ASCII to EBCDIC conversion for textual header
     char asciiToEbcdic(unsigned char asciiChar);
     
     // Helper function to write field to header buffer
-    void writeFieldToHeader(void* header, const void* data, const SEGY::HeaderField& headerField, SEGY::Endianness endianness);
+    void writeFieldToHeader(void* header, const void* data, const SEGY::HeaderField& headerField);
     
     // Convert sample data to proper endianness and format
     void convertSampleDataForWriting(std::vector<char>& sampleData);
-    
-    // Generate trace header with coordinate information
-    void generateTraceHeader(SEGYTraceData& traceData);
-    
+
+    int64_t calculateFilePosition(int inlineNum, int crosslineNum);
 public:
     SEGYWriter();
     ~SEGYWriter();
@@ -133,7 +131,7 @@ public:
     // Configuration methods
     
     // Add custom header field definition
-    void addBinaryField(const std::string& name, int byteLocation, int width);
+    void addBinaryField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
 
     // Add custom trace field definition
     void addTraceField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format);
@@ -146,30 +144,26 @@ public:
     // Finalize file writing and close
     bool finalize();
     
-    // Data writing methods
-    
-    // Add single trace to buffer
-    bool addTrace(int inlineNum, int crosslineNum, const void* sampleData, 
-                  const std::map<std::string, int>& customHeaders = {});
-    
-    // Add trace with custom trace header
-    bool addTraceWithHeader(int inlineNum, int crosslineNum, const void* sampleData,
-                           const void* traceHeader);
-    
-    // Flush buffered traces to file
-    bool flushTraces();
-    
     // Write trace data into file
     bool writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, const void* sampleData);
 
     // Write trace header into file
-    bool writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, const void* traceHeader);
-    
-    // Calculate expected file size
-    int64_t getExpectedFileSize() const;
+    bool writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, const void* traceHeader, int offset);
     
     // Error handling
     std::string getLastError() const { return m_lastError; }
-    
+
+    // Get the size of a single trace in bytes
+    int getTraceByteSize() const { return m_writeInfo.traceByteSize; }
+
+    SEGY::HeaderField getTraceField(const std::string& name) const {
+        auto it = m_traceFields.find(name);
+        if (it != m_traceFields.end()) {
+            return it->second;
+        }
+        return SEGY::HeaderField();
+    }
+
+    std::string getErrMsg() { return m_lastError;}
 
 };

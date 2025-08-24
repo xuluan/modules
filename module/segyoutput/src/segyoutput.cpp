@@ -50,10 +50,7 @@ void segyoutput_init(const char* myid, const char* buf)
         std::filesystem::path parent_dir = output_path.parent_path();
         if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
             throw std::runtime_error("Error: segyoutput parent directory does not exist: " + parent_dir.string());
-        }
-      
-        gd_logger.LogInfo(my_logger, "segyoutput run_mode: {}", run_mode);
-            
+        }            
         // Get data flow information to configure SEGY writer
         my_data->pkey_name = job_df.GetPrimaryKeyName();
         my_data->skey_name = job_df.GetSecondaryKeyName();
@@ -211,10 +208,10 @@ void segyoutput_init(const char* myid, const char* buf)
         SEGYWriteInfo write_info;
 
         // Configure SEGY write info
-        write_info.headerEndianness = SEGY::Endianness::Big; // Standard SEGY big-endian
+        write_info.headerEndianness = SEGY::Endianness::BigEndian; // Standard SEGY big-endian
         write_info.dataSampleFormatCode = segy_format;
         write_info.sampleCount = my_data->trace_length;
-        my_data->write_info.sampleInterval = my_data->sinterval;
+        write_info.sampleInterval = my_data->sinterval;
         
         // Calculate trace byte size based on format
         int sample_size = 0;
@@ -244,13 +241,6 @@ void segyoutput_init(const char* myid, const char* buf)
         write_info.primaryStep = my_data->pkinc;
         write_info.secondaryStep = my_data->skinc;
         write_info.isPrimaryInline = true; // Assume inline is primary
-        
-        // Set header field locations
-        write_info.primaryKey = {my_data->primary_offset, 4, true};
-        write_info.secondaryKey = {my_data->secondary_offset, 4, true};
-        write_info.numSamplesKey = {my_data->trace_length_offset, 2, true};
-        write_info.sampleIntervalKey = {my_data->sinterval_offset, 2, true};
-        write_info.dataSampleFormatCodeKey = {my_data->data_format_code_offset, 2, true};
 
         // Set textual header content
         write_info.textualHeaderContent = "C01 SEGY file created by segyoutput module\n";
@@ -261,7 +251,60 @@ void segyoutput_init(const char* myid, const char* buf)
 
         // Calculate total expected traces
         my_data->total_expected_traces = static_cast<int64_t>(my_data->num_pkey) * my_data->num_skey;
-        
+
+        my_data->segy_writer.addTraceField(my_data->pkey_name, my_data->primary_offset, 4, SEGY::DataSampleFormatCode::Int32);
+        my_data->segy_writer.addTraceField(my_data->skey_name, my_data->secondary_offset, 4, SEGY::DataSampleFormatCode::Int32);
+
+        my_data->segy_writer.addBinaryField("NumSamples", my_data->trace_length_offset, 2, SEGY::DataSampleFormatCode::Int16);
+        my_data->segy_writer.addBinaryField("SampleInterval", my_data->sinterval_offset, 2, SEGY::DataSampleFormatCode::Int16);
+        my_data->segy_writer.addBinaryField("DataFormatCode", my_data->data_format_code_offset, 2, SEGY::DataSampleFormatCode::Int16);
+
+        // add sttributes
+        auto& attrs = config["segyoutput"]["attribute"];
+        if(attrs.is_array()) {
+            //parse attributes
+            auto& arr = config["segyoutput"]["attribute"].as_array();
+            for (size_t i = 0; i < arr.size(); ++i) {
+                auto& attr = arr[i];
+                std::string name = attr.at("name", "attribute").as_string();
+                gutl::UTL_StringToUpperCase(name);
+
+                if(name == my_data->pkey_name || name == my_data->skey_name || name == my_data->trace_name) {
+                    //todo log warning
+                    continue;
+                }
+
+                std::string datatype = attr.at("datatype", "attribute").as_string();
+                int offset = attr.at("offset", "attribute").as_int();
+                int width;
+                SEGY::DataSampleFormatCode format;
+                as::DataFormat type;
+
+                if (datatype == "int8") {
+                    format = SEGY::DataSampleFormatCode::Int8;
+                    type = as::DataFormat::FORMAT_U8;
+                    width = 1;
+                } else if (datatype == "int16") {
+                    format = SEGY::DataSampleFormatCode::Int16;
+                    type = as::DataFormat::FORMAT_U16;
+                    width = 2;
+                } else if (datatype == "int32") {
+                    format = SEGY::DataSampleFormatCode::Int32;
+                    type = as::DataFormat::FORMAT_U32;
+                    width = 4;
+                } else if (datatype == "float") {
+                    format = SEGY::DataSampleFormatCode::IEEEFloat;
+                    type = as::DataFormat::FORMAT_R32;
+                    width = 4;
+                } else {
+                    throw std::runtime_error("Error: segyoutput the datatype of attribute " + name + " is invalid: " + datatype);
+                }
+                my_data->segy_writer.addTraceField(name, offset, width, format);
+                job_df.AddAttribute(name.c_str(), type, 1);
+                job_df.SetAttributeUnit(name.c_str(), "");
+            }
+        }   
+
         // Initialize the writer and create output file
         if (!my_data->segy_writer.initialize(my_data->output_url, write_info)) {
             throw std::runtime_error("Error: failed to initialize SEGY writer for file: " + my_data->output_url + 
@@ -273,8 +316,6 @@ void segyoutput_init(const char* myid, const char* buf)
         
         gd_logger.LogInfo(my_logger, "SEGY writer initialized successfully");
         gd_logger.LogInfo(my_logger, "Expected total traces: {}", my_data->total_expected_traces);
-        gd_logger.LogInfo(my_logger, "Expected file size: {} bytes", my_data->segy_writer->getExpectedFileSize());
-
             
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
 
@@ -307,107 +348,77 @@ void segyoutput_process(const char* myid)
         return;
     }
 
-    try {
-        // Get current data from GeoDataFlow
+    try {        
+        // setup primary and secondary
         int grp_size = job_df.GetGroupSize();
-        
-        // Get primary and secondary key data
-        const int* pkey = static_cast<const int*>(job_df.GetWritableBuffer(job_df.GetPrimaryKeyName()));
+        int* pkey;
+        pkey = static_cast<int*>(job_df.GetWritableBuffer(job_df.GetPrimaryKeyName()));
         if(pkey == nullptr) {
-            throw std::runtime_error("Error: DF returned nullptr for primary key buffer");
+            gd_logger.LogError(my_logger, "DF returned a nullptr to the buffer of pkey is NULL");
+            job_df.SetJobAborted();
+            _clean_up();
+            return;
         }
-        
-        const int* skey = static_cast<const int*>(job_df.GetWritableBuffer(job_df.GetSecondaryKeyName()));
+
+        std::fill(pkey, pkey + grp_size, my_data->current_pkey);
+        gd_logger.LogInfo(my_logger, "Process primary key {}\n", pkey[0]);
+
+        int* skey;
+        skey = static_cast<int*>(job_df.GetWritableBuffer(job_df.GetSecondaryKeyName()));
         if(skey == nullptr) {
-            throw std::runtime_error("Error: DF returned nullptr for secondary key buffer");
+            gd_logger.LogError(my_logger, "DF returned a nullptr to the buffer of skey is NULL");
+            job_df.SetJobAborted();
+            _clean_up();
+            return;
         }
-        
-        // Get trace data
-        const void* trace_data = job_df.GetWritableBuffer(job_df.GetVolumeDataName());
-        if(trace_data == nullptr) {
-            throw std::runtime_error("Error: DF returned nullptr for trace data buffer");
+
+        std::copy(my_data->skeys.begin(), my_data->skeys.end(), skey);    
+
+        std::string data_name = job_df.GetVolumeDataName();
+
+        std::ofstream file(my_data->output_url, std::ios::binary);
+        if (!file) {
+            throw std::runtime_error("Error: write trace, primary: " + my_data->output_url);
         }
-        
-        gd_logger.LogInfo(my_logger, "Processing primary key {}, group size: {}", pkey[0], grp_size);
-        
-        // Calculate trace data size per trace
-        int trace_byte_size = my_data->write_info.traceByteSize;
-        const char* trace_data_ptr = static_cast<const char*>(trace_data);
-        
-        // Write traces for current primary key
-        for(int i = 0; i < grp_size; i++) {
-            int current_inline = pkey[i];
-            int current_crossline = skey[i];
-            
-            // Calculate offset for current trace data
-            const void* current_trace_data = trace_data_ptr + (i * trace_byte_size);
-            
-            // Create custom headers map for additional attributes
-            std::map<std::string, int> custom_headers;
-            
-            // Process all attributes to find additional header fields
-            for(int attr_idx = 0; attr_idx < job_df.GetNumAttributes(); attr_idx++) {
-                std::string attr_name = job_df.GetAttributeName(attr_idx);
-                
-                // Skip primary key, secondary key, and trace data
-                if(attr_name == my_data->pkey_name || 
-                   attr_name == my_data->skey_name || 
-                   attr_name == my_data->trace_name) {
-                    continue;
+        //write data: primary, secondary, trace and attributes
+        for(int i = 0; i < job_df.GetNumAttributes(); i++) {
+
+            std::string attr_name = job_df.GetAttributeName(i);
+
+            char *data = static_cast<char*>(job_df.GetWritableBuffer(attr_name.c_str()));
+            int bytesize = my_data->segy_writer.getTraceByteSize();
+            if(data == nullptr) {
+                throw std::runtime_error("DF returned a nullptr to the buffer of attribute: " + attr_name);
+            }
+
+            SEGY::HeaderField field = my_data->segy_writer.getTraceField(attr_name);
+
+            if (field.defined()) {
+                bytesize =  field.fieldWidth;
+            }
+
+            for(int j = my_data->fskey; j <= my_data->lskey; j+=my_data->skinc) {
+                if(attr_name == data_name) {
+                    if(!my_data->segy_writer.writeTraceData(file, my_data->current_pkey, j, data)) {
+                        throw std::runtime_error("Error: write trace, primary: " + std::to_string(i)
+                            + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->segy_writer.getErrMsg());
+                    }
+                } else {
+                    if(!my_data->segy_writer.writeTraceHeader(file, my_data->current_pkey, j, data, field.byteLocation)) {
+                        throw std::runtime_error("Error: write trace, primary: " + std::to_string(i) 
+                            + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->segy_writer.getErrMsg());
+                    }
                 }
-                
-                // Get attribute data for custom headers
-                const void* attr_data = job_df.GetWritableBuffer(attr_name.c_str());
-                if(attr_data != nullptr) {
-                    // Assume attribute is integer type for SEGY headers
-                    const int* attr_int_data = static_cast<const int*>(attr_data);
-                    custom_headers[attr_name] = attr_int_data[i];
-                }
-            }
-            
-            // Write trace to SEGY file
-            if(!my_data->segy_writer->addTrace(current_inline, current_crossline, 
-                                              current_trace_data, custom_headers)) {
-                throw std::runtime_error("Error: failed to write trace (" + 
-                                       std::to_string(current_inline) + ", " + 
-                                       std::to_string(current_crossline) + "): " + 
-                                       my_data->segy_writer->getLastError());
-            }
-            
-            my_data->traces_written++;
-            
-            // Log progress periodically
-            if(my_data->traces_written % 1000 == 0) {
-                double progress = (double)my_data->traces_written / my_data->total_expected_traces * 100.0;
-                gd_logger.LogInfo(my_logger, "Progress: {}/{} traces written ({:.1f}%)", 
-                                 my_data->traces_written, my_data->total_expected_traces, progress);
+                data += bytesize;
             }
         }
-        
-        // Flush traces to ensure they are written to disk
-        if(!my_data->segy_writer->flushTraces()) {
-            throw std::runtime_error("Error: failed to flush traces to disk");
-        }
-        
-        // Check if we've written all expected traces
-        if(my_data->traces_written >= my_data->total_expected_traces) {
-            gd_logger.LogInfo(my_logger, "All traces written successfully: {}/{}", 
-                             my_data->traces_written, my_data->total_expected_traces);
-            
-            // Finalize the SEGY file
-            if(!my_data->segy_writer->finalize()) {
-                throw std::runtime_error("Error: failed to finalize SEGY file: " + 
-                                       my_data->segy_writer->getLastError());
-            }
-            
-            gd_logger.LogInfo(my_logger, "SEGY file finalized successfully: {}", my_data->output_url);
-            job_df.SetJobFinished();
-        }
-        
+        file.close();      
     } catch (const std::exception& e) {
         gd_logger.LogError(my_logger, "Exception in segyoutput_process: {}", e.what());
         job_df.SetJobAborted();
         _clean_up();
         return;
     }
+    // prepare for the next call
+    my_data->current_pkey = my_data->current_pkey + my_data->pkinc;
 }

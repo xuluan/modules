@@ -47,22 +47,6 @@ struct Segyoutput {
     int64_t total_expected_traces;
     
     void* logger;
-    
-    Segyoutput() : segy_writer(nullptr), is_dry_run(false), file_initialized(false), 
-                   header_written(false), traces_written(0), total_expected_traces(0),
-                   primary_offset(0), secondary_offset(0), sinterval_offset(0),
-                   trace_length_offset(0), data_format_code_offset(0),
-                   fpkey(0), lpkey(0), fskey(0), lskey(0), pkinc(1), skinc(1),
-                   trace_length(0), sinterval(0), tmin(0.0f), tmax(0.0f),
-                   num_skey(0), num_pkey(0), current_pkey(0), logger(nullptr) {}
-    
-    ~Segyoutput() {
-        if (segy_writer) {
-            segy_writer->finalize();
-            delete segy_writer;
-            segy_writer = nullptr;
-        }
-    }
 };
 
 #ifdef __cplusplus
