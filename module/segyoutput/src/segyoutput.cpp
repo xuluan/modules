@@ -10,6 +10,14 @@
 #include <utl_yaml_parser.h>
 #include <utl_string.h>
 
+bool check_offset(int offset, int width, int header_size)
+{
+    if(offset > 0 && (offset + width - 1) <= header_size) {
+        return true;
+    }
+    return false;
+}
+
 void segyoutput_init(const char* myid, const char* buf)
 {
     std::string logger_name = std::string {"segyoutput_"} + myid;
@@ -240,7 +248,6 @@ void segyoutput_init(const char* myid, const char* buf)
         write_info.crosslineCount = my_data->num_skey;
         write_info.primaryStep = my_data->pkinc;
         write_info.secondaryStep = my_data->skinc;
-        write_info.isPrimaryInline = true; // Assume inline is primary
 
         // Set textual header content
         write_info.textualHeaderContent = "C01 SEGY file created by segyoutput module\n";
@@ -251,6 +258,29 @@ void segyoutput_init(const char* myid, const char* buf)
 
         // Calculate total expected traces
         my_data->total_expected_traces = static_cast<int64_t>(my_data->num_pkey) * my_data->num_skey;
+
+        if(!check_offset(my_data->primary_offset, 4, 240)) {
+            throw std::runtime_error("Error: segyoutput the offset of attribute " + my_data->pkey_name + " is invalid: " + std::to_string(my_data->primary_offset));
+        }
+
+        if(!check_offset(my_data->secondary_offset, 4, 240)) {
+            throw std::runtime_error("Error: segyoutput the offset of attribute " + my_data->skey_name + " is invalid: " + std::to_string(my_data->secondary_offset));
+        }
+
+
+        if(!check_offset(my_data->trace_length_offset, 2, 400)) {
+            throw std::runtime_error("Error: segyoutput the offset of NumSamples is invalid: " + std::to_string(my_data->trace_length_offset));
+        }
+
+
+        if(!check_offset(my_data->data_format_code_offset, 2, 400)) {
+            throw std::runtime_error("Error: segyoutput the offset of DataFormatCode is invalid: " + std::to_string(my_data->data_format_code_offset));
+        }
+        
+
+        if(!check_offset(my_data->sinterval_offset, 2, 400)) {
+            throw std::runtime_error("Error: segyoutput the offset of SampleInterval is invalid: " + std::to_string(my_data->sinterval_offset));
+        }
 
         my_data->segy_writer.addTraceField(my_data->pkey_name, my_data->primary_offset, 4, SEGY::DataSampleFormatCode::Int32);
         my_data->segy_writer.addTraceField(my_data->skey_name, my_data->secondary_offset, 4, SEGY::DataSampleFormatCode::Int32);
@@ -299,6 +329,9 @@ void segyoutput_init(const char* myid, const char* buf)
                 } else {
                     throw std::runtime_error("Error: segyoutput the datatype of attribute " + name + " is invalid: " + datatype);
                 }
+                if(!check_offset(offset, width, 240)) {
+                    throw std::runtime_error("Error: segyoutput the offset of attribute " + name + " is invalid: " + std::to_string(offset));
+                }                
                 my_data->segy_writer.addTraceField(name, offset, width, format);
                 job_df.AddAttribute(name.c_str(), type, 1);
                 job_df.SetAttributeUnit(name.c_str(), "");
@@ -404,7 +437,7 @@ void segyoutput_process(const char* myid)
                             + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->segy_writer.getErrMsg());
                     }
                 } else {
-                    if(!my_data->segy_writer.writeTraceHeader(file, my_data->current_pkey, j, data, field.byteLocation)) {
+                    if(!my_data->segy_writer.writeTraceHeader(file, my_data->current_pkey, j, data, field.byteLocation, field.fieldWidth)) {
                         throw std::runtime_error("Error: write trace, primary: " + std::to_string(i) 
                             + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->segy_writer.getErrMsg());
                     }

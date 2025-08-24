@@ -93,7 +93,15 @@ bool SEGYWriter::initialize(const std::string& filename, SEGYWriteInfo writeInfo
             m_lastError = "Failed to write binary header";
             return false;
         }
-        
+
+        int traceCount = m_writeInfo.inlineCount * m_writeInfo.crosslineCount;
+        int traceSize = 240 + m_writeInfo.traceByteSize;
+        for(int i = 0; i < traceCount; ++i) {
+            // Write empty trace headers and data
+            std::vector<char> emptyTraceHeader(traceSize, 0);
+            file.write(emptyTraceHeader.data(), traceSize);
+        }
+
         m_initialized = true;
         m_fileCreated = true;
         
@@ -113,7 +121,7 @@ bool SEGYWriter::finalize() {
     return true;
 }
 
-bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, const void* sampleData) {
+bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, char* sampleData) {
     if (!m_initialized) {
         m_lastError = "Writer not initialized";
         return false;
@@ -132,6 +140,7 @@ bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslin
 
         // Seek to position and write sample data
         file.seekp(filePosition, std::ios::beg);
+        convertSampleDataForWriting(sampleData);
         file.write(static_cast<const char*>(sampleData), m_writeInfo.traceByteSize);
         
         if (file.fail()) {
@@ -147,7 +156,7 @@ bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslin
     }
 }
 
-bool SEGYWriter::writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, const void* traceHeader, int offset) {
+bool SEGYWriter::writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, char* data, int offset, int len) {
     if (!m_initialized) {
         m_lastError = "Writer not initialized";
         return false;
@@ -160,10 +169,21 @@ bool SEGYWriter::writeTraceHeader(std::ofstream& file, int inlineNum, int crossl
             m_lastError = "Invalid trace coordinates: " + std::to_string(inlineNum) + ", " + std::to_string(crosslineNum);
             return false;
         }
+
+        if (m_writeInfo.headerEndianness == SEGY::Endianness::BigEndian) {
+            if (len == 4) {
+                uint32_t* value = reinterpret_cast<uint32_t*>(data);
+                *value = ((*value & 0xFF) << 24) | ((*value & 0xFF00) << 8) | 
+                        ((*value & 0xFF0000) >> 8) | ((*value & 0xFF000000) >> 24);
+            } else if (len == 2) {
+                uint16_t* value = reinterpret_cast<uint16_t*>(data);
+                *value = ((*value & 0xFF) << 8) | ((*value & 0xFF00) >> 8);
+            }        
+        }
         
         // Seek to position and write trace header
         file.seekp(filePosition + offset - 1, std::ios::beg);
-        file.write(static_cast<const char*>(traceHeader), 240);
+        file.write(data, len);
         
         if (file.fail()) {
             m_lastError = "Failed to write trace header at position";
@@ -199,6 +219,25 @@ void SEGYWriter::generateTextualHeader(std::vector<char>& textualHeader) {
 }
 
 void SEGYWriter::generateBinaryHeader(std::vector<char>& binaryHeader) {
+
+    for(auto binary_field = m_binaryFields.begin(); binary_field != m_binaryFields.end(); ++binary_field) {
+        const std::string& name = binary_field->first;
+        const SEGY::HeaderField& field = binary_field->second;
+
+        if (name == "DataFormatCode") {
+            int16_t value = static_cast<int16_t>(m_writeInfo.dataSampleFormatCode);
+            writeFieldToHeader(binaryHeader.data(), &value, field);
+        } else if (name == "SampleInterval") {
+            int16_t value = static_cast<int16_t>(m_writeInfo.sampleInterval);
+            writeFieldToHeader(binaryHeader.data(), &value, field);
+        } else if (name == "NumSamples") {
+            int16_t value = static_cast<int16_t>(m_writeInfo.sampleCount);
+            writeFieldToHeader(binaryHeader.data(), &value, field);
+        } else {
+
+        }
+    }
+
 }
 
 bool SEGYWriter::writeTextualHeader(std::ofstream& file) {
@@ -210,7 +249,7 @@ bool SEGYWriter::writeTextualHeader(std::ofstream& file) {
 }
 
 bool SEGYWriter::writeBinaryHeader(std::ofstream& file) {
-    std::vector<char> binaryHeader;
+    std::vector<char> binaryHeader(400, 0);
     generateBinaryHeader(binaryHeader);
     
     file.write(binaryHeader.data(), 400);
@@ -242,10 +281,35 @@ char SEGYWriter::asciiToEbcdic(unsigned char asciiChar) {
 }
 
 void SEGYWriter::writeFieldToHeader(void* header, const void* data, const SEGY::HeaderField& headerField) {
+    char* headerPtr = static_cast<char*>(header);
+    const char* dataPtr = static_cast<const char*>(data);
+    SEGY::Endianness endianness = m_writeInfo.headerEndianness;
 
+    // Calculate offset (SEGY headers are 1-based, so subtract 1)
+    int offset = headerField.byteLocation - 1;
+    
+    if (headerField.fieldWidth == 2) {
+        // 16-bit field
+        short value = *static_cast<const short*>(data);
+        if (endianness == SEGY::Endianness::BigEndian) {
+            value = ((value & 0xFF) << 8) | ((value & 0xFF00) >> 8);
+        }
+        std::memcpy(headerPtr + offset, &value, 2);
+    } else if (headerField.fieldWidth == 4) {
+        // 32-bit field
+        int value = *static_cast<const int*>(data);
+        if (endianness == SEGY::Endianness::BigEndian) {
+            value = ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | 
+                    ((value & 0xFF0000) >> 8) | ((value & 0xFF000000) >> 24);
+        }
+        std::memcpy(headerPtr + offset, &value, 4);
+    } else {
+        // Variable width field - copy as is
+        std::memcpy(headerPtr + offset, dataPtr, headerField.fieldWidth);
+    }
 }
 
-void SEGYWriter::convertSampleDataForWriting(std::vector<char>& sampleData) {
+void SEGYWriter::convertSampleDataForWriting(char* data) {
     // Convert sample data based on format and endianness
     if (m_writeInfo.headerEndianness == SEGY::Endianness::BigEndian) {
         // Convert to big endian
@@ -263,14 +327,14 @@ void SEGYWriter::convertSampleDataForWriting(std::vector<char>& sampleData) {
             default:
                 return; // Unsupported format
         }
-        
-        for (size_t i = 0; i < sampleData.size(); i += sampleSize) {
+
+        for (size_t i = 0; i < m_writeInfo.sampleCount; ++i) {
             if (sampleSize == 4) {
-                uint32_t* value = reinterpret_cast<uint32_t*>(&sampleData[i]);
+                uint32_t* value = reinterpret_cast<uint32_t*>(&data[i*sampleSize]);
                 *value = ((*value & 0xFF) << 24) | ((*value & 0xFF00) << 8) | 
                         ((*value & 0xFF0000) >> 8) | ((*value & 0xFF000000) >> 24);
             } else if (sampleSize == 2) {
-                uint16_t* value = reinterpret_cast<uint16_t*>(&sampleData[i]);
+                uint16_t* value = reinterpret_cast<uint16_t*>(&data[i*sampleSize]);
                 *value = ((*value & 0xFF) << 8) | ((*value & 0xFF00) >> 8);
             }
         }
@@ -278,41 +342,9 @@ void SEGYWriter::convertSampleDataForWriting(std::vector<char>& sampleData) {
 }
 
 int64_t SEGYWriter::calculateFilePosition(int inlineNum, int crosslineNum) {
-    // Validate coordinates are within bounds
-    if (inlineNum < m_writeInfo.minInline || inlineNum > m_writeInfo.maxInline ||
-        crosslineNum < m_writeInfo.minCrossline || crosslineNum > m_writeInfo.maxCrossline) {
-        return -1; // Invalid coordinates
-    }
-    
-    int64_t traceIndex = 0;
-    
-    if (m_writeInfo.isPrimaryInline) {
-        // Primary key is inline, secondary key is crossline
-        // Calculate inline index
-        int inlineIndex = (inlineNum - m_writeInfo.minInline) / m_writeInfo.primaryStep;
-        
-        // Calculate crossline index  
-        int crosslineIndex = (crosslineNum - m_writeInfo.minCrossline) / m_writeInfo.secondaryStep;
-        
-        // Calculate linear trace index (inline major ordering)
-        traceIndex = static_cast<int64_t>(inlineIndex) * m_writeInfo.crosslineCount + crosslineIndex;
-    } else {
-        // Primary key is crossline, secondary key is inline
-        // Calculate crossline index
-        int crosslineIndex = (crosslineNum - m_writeInfo.minCrossline) / m_writeInfo.primaryStep;
-        
-        // Calculate inline index
-        int inlineIndex = (inlineNum - m_writeInfo.minInline) / m_writeInfo.secondaryStep;
-        
-        // Calculate linear trace index (crossline major ordering)
-        traceIndex = static_cast<int64_t>(crosslineIndex) * m_writeInfo.inlineCount + inlineIndex;
-    }
-    
-    // Validate trace index is within expected bounds
-    int64_t totalExpectedTraces = static_cast<int64_t>(m_writeInfo.inlineCount) * m_writeInfo.crosslineCount;
-    if (traceIndex < 0 || traceIndex >= totalExpectedTraces) {
-        return -1; // Invalid trace index
-    }
-    
-    return traceIndex;
+    int64_t count = inlineNum * m_writeInfo.crosslineCount + crosslineNum;
+    int traceSize = 240 + m_writeInfo.traceByteSize;
+
+    return count * traceSize;
+
 }

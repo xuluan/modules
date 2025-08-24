@@ -75,13 +75,10 @@ struct SEGYWriteInfo {
     int minInline, maxInline, inlineCount;
     int minCrossline, maxCrossline, crosslineCount;
     int primaryStep, secondaryStep;
-    bool isPrimaryInline;
- 
+
     // Custom textual header content
     std::string textualHeaderContent;
     
-    // Custom binary header values
-    std::map<std::string, int> binaryHeaderValues;
 };
 
 // SEGY file writer class for creating standard SEGY files
@@ -121,7 +118,7 @@ private:
     void writeFieldToHeader(void* header, const void* data, const SEGY::HeaderField& headerField);
     
     // Convert sample data to proper endianness and format
-    void convertSampleDataForWriting(std::vector<char>& sampleData);
+    void convertSampleDataForWriting(char* data);
 
     int64_t calculateFilePosition(int inlineNum, int crosslineNum);
 public:
@@ -145,10 +142,10 @@ public:
     bool finalize();
     
     // Write trace data into file
-    bool writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, const void* sampleData);
+    bool writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, char* sampleData);
 
     // Write trace header into file
-    bool writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, const void* traceHeader, int offset);
+    bool writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, char* data, int offset, int len);
     
     // Error handling
     std::string getLastError() const { return m_lastError; }
