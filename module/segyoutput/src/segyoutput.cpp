@@ -256,13 +256,6 @@ void segyoutput_init(const char* myid, const char* buf)
         write_info.primaryStep = my_data->pkinc;
         write_info.secondaryStep = my_data->skinc;
 
-        // Set textual header content
-        write_info.textualHeaderContent = "C01 SEGY file created by segyoutput module\n";
-        write_info.textualHeaderContent += "C02 Inline range: " + std::to_string(my_data->fpkey) + " - " + std::to_string(my_data->lpkey) + "\n";
-        write_info.textualHeaderContent += "C03 Crossline range: " + std::to_string(my_data->fskey) + " - " + std::to_string(my_data->lskey) + "\n";
-        write_info.textualHeaderContent += "C04 Sample count: " + std::to_string(my_data->trace_length) + "\n";
-        write_info.textualHeaderContent += "C05 Sample interval: " + std::to_string(my_data->sinterval) + " microseconds\n";
-
         // Calculate total expected traces
         my_data->total_expected_traces = static_cast<int64_t>(my_data->num_pkey) * my_data->num_skey;
 

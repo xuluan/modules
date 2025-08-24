@@ -75,9 +75,6 @@ struct SEGYWriteInfo {
     int minInline, maxInline, inlineCount;
     int minCrossline, maxCrossline, crosslineCount;
     int primaryStep, secondaryStep;
-
-    // Custom textual header content
-    std::string textualHeaderContent;
     
 };
 
