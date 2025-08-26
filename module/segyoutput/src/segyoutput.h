@@ -9,7 +9,7 @@
 #include "segy_writer.h"
 
 struct Segyoutput {
-    std::string output_url;
+    std::string url;
     SEGYWriter segy_writer;
     
     std::string pkey_name;

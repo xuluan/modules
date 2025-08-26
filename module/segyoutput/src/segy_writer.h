@@ -44,8 +44,6 @@ namespace SEGY {
         HeaderField(int loc, int width, DataSampleFormatCode type) : byteLocation(loc), fieldWidth(width), fieldType(type) {}
         bool defined() const { return byteLocation != 0; }
     };
-    // OpenVDS-style ReadFieldFromHeader implementation
-    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
 }
 
 // Enhanced structure for writing SEGY data
@@ -78,6 +76,8 @@ private:
     
     gdlog::GdLogger* m_logger;
     void* m_log_data;
+
+    std::ofstream m_outputFile;
     
     // Private helper functions for file creation
     
@@ -124,10 +124,10 @@ public:
     bool finalize();
     
     // Write trace data into file
-    bool writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, char* sampleData);
+    bool writeTraceData(int inlineNum, int crosslineNum, char* sampleData);
 
     // Write trace header into file
-    bool writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, char* data, int offset, int len);
+    bool writeTraceHeader(int inlineNum, int crosslineNum, char* data, int offset, int len);
     
     // Error handling
     std::string getLastError() const { return m_lastError; }
@@ -144,5 +144,6 @@ public:
     }
 
     std::string getErrMsg() { return m_lastError;}
+    void finished();
 
 };

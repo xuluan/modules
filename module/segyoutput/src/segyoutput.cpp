@@ -46,15 +46,15 @@ void segyoutput_init(const char* myid, const char* buf)
 
         auto& segyout_config = config["segyoutput"];
 
-        //parse output_url
-        my_data->output_url = segyout_config.at("output_url", "segyoutput").as_string();
-        if (my_data->output_url.empty()) {
-            throw std::runtime_error("Error: segyoutput output_url is empty");
+        //parse url
+        my_data->url = segyout_config.at("url", "segyoutput").as_string();
+        if (my_data->url.empty()) {
+            throw std::runtime_error("Error: segyoutput url is empty");
         }
-        gd_logger.LogInfo(my_logger, "segyoutput output_url: {}", my_data->output_url);
+        gd_logger.LogInfo(my_logger, "segyoutput url: {}", my_data->url);
 
         // Check if parent directory exists
-        std::filesystem::path output_path(my_data->output_url);
+        std::filesystem::path output_path(my_data->url);
         std::filesystem::path parent_dir = output_path.parent_path();
         if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
             throw std::runtime_error("Error: segyoutput parent directory does not exist: " + parent_dir.string());
@@ -77,7 +77,7 @@ void segyoutput_init(const char* myid, const char* buf)
         my_data->skinc = (my_data->num_skey > 1) ? (my_data->lskey - my_data->fskey) / (my_data->num_skey - 1) : 1;
         
         // Get sample interval from data flow
-        my_data->sinterval = static_cast<int>(job_df.GetDataSampleRate() * 1000); // Convert to microseconds
+        my_data->sinterval = (my_data->tmax - my_data->tmin) * 1000 /(my_data->trace_length - 1);
         my_data->current_pkey = my_data->fpkey;
 
         gd_logger.LogInfo(my_logger, "Primary axis: {} to {} ({} values, inc={})", 
@@ -263,8 +263,8 @@ void segyoutput_init(const char* myid, const char* buf)
         }   
 
         // Initialize the writer and create output file
-        if (!my_data->segy_writer.initialize(my_data->output_url, write_info)) {
-            throw std::runtime_error("Error: failed to initialize SEGY writer for file: " + my_data->output_url + 
+        if (!my_data->segy_writer.initialize(my_data->url, write_info)) {
+            throw std::runtime_error("Error: failed to initialize SEGY writer for file: " + my_data->url + 
                                     ", Error: " + my_data->segy_writer.getLastError());
         }
         
@@ -296,6 +296,9 @@ void segyoutput_process(const char* myid)
     };
 
     if (job_df.JobFinished()) {
+
+        my_data->segy_writer.finished();
+
         _clean_up();
         return;
     }
@@ -305,10 +308,6 @@ void segyoutput_process(const char* myid)
 
         std::string data_name = job_df.GetVolumeDataName();
 
-        std::ofstream file(my_data->output_url, std::ios::binary);
-        if (!file) {
-            throw std::runtime_error("Error: write trace, primary: " + my_data->output_url);
-        }
         //write data: primary, secondary, trace and attributes
         for(int i = 0; i < job_df.GetNumAttributes(); i++) {
 
@@ -325,15 +324,16 @@ void segyoutput_process(const char* myid)
             if (field.defined()) {
                 bytesize =  field.fieldWidth;
             }
+            printf("attr %s, %d %d\n", attr_name.c_str(), bytesize, field.byteLocation);
 
             for(int j = my_data->fskey; j <= my_data->lskey; j+=my_data->skinc) {
                 if(attr_name == data_name) {
-                    if(!my_data->segy_writer.writeTraceData(file, my_data->current_pkey, j, data)) {
+                    if(!my_data->segy_writer.writeTraceData(my_data->current_pkey, j, data)) {
                         throw std::runtime_error("Error: write trace, primary: " + std::to_string(i)
                             + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->segy_writer.getErrMsg());
                     }
                 } else {
-                    if(!my_data->segy_writer.writeTraceHeader(file, my_data->current_pkey, j, data, field.byteLocation, field.fieldWidth)) {
+                    if(!my_data->segy_writer.writeTraceHeader(my_data->current_pkey, j, data, field.byteLocation, field.fieldWidth)) {
                         throw std::runtime_error("Error: write trace, primary: " + std::to_string(i) 
                             + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->segy_writer.getErrMsg());
                     }
@@ -341,7 +341,7 @@ void segyoutput_process(const char* myid)
                 data += bytesize;
             }
         }
-        file.close();      
+        //file.close();      
     } catch (const std::exception& e) {
         gd_logger.LogError(my_logger, "Exception in segyoutput_process: {}", e.what());
         job_df.SetJobAborted();

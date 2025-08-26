@@ -3,49 +3,6 @@
 #include <algorithm>
 #include <sstream>
 
-namespace SEGY {
-
-    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness) {
-        if (!headerField.defined()) {
-            return;
-        }
-        
-        int index = headerField.byteLocation - 1;
-        auto signed_header = reinterpret_cast<const signed char *>(header);
-        auto unsigned_header = reinterpret_cast<const unsigned char *>(header);
-        
-        if (headerField.fieldWidth == 4) {
-            int32_t result;
-            if (endianness == Endianness::BigEndian) {
-                result = (int32_t)(signed_header[index + 0] << 24 | unsigned_header[index + 1] << 16 | 
-                               unsigned_header[index + 2] << 8 | unsigned_header[index + 3]);
-            } else {
-                result = (int32_t)(signed_header[index + 3] << 24 | unsigned_header[index + 2] << 16 | 
-                               unsigned_header[index + 1] << 8 | unsigned_header[index + 0]);
-            }
-            *reinterpret_cast<int32_t*>(data) = result;
-        } else if (headerField.fieldWidth == 2) {
-            int16_t result;
-            if (endianness == Endianness::BigEndian) {
-                result = (int16_t)(signed_header[index + 0] << 8 | unsigned_header[index + 1]);
-            } else {
-                result = (int16_t)(signed_header[index + 1] << 8 | unsigned_header[index + 0]);
-            }
-            *reinterpret_cast<int16_t*>(data) = result;
-        } else if (headerField.fieldWidth == 1) {
-            int8_t result = signed_header[index];
-            *reinterpret_cast<int8_t*>(data) = result;
-        }
-    }
-    
-    // Helper function for backward compatibility
-    int readFieldFromHeaderInt(const void *header, const HeaderField &headerField, Endianness endianness) {
-        int result = 0;
-        readFieldFromHeader(header, &result, headerField, endianness);
-        return result;
-    }
-}
-
 SEGYWriter::SEGYWriter() 
     : m_initialized(false), m_fileCreated(false), m_log_data(nullptr) {
     
@@ -54,6 +11,9 @@ SEGYWriter::SEGYWriter()
 }
 
 SEGYWriter::~SEGYWriter() {
+    if (m_outputFile.is_open()){
+        m_outputFile.close();
+    }
 }
 
 void SEGYWriter::addBinaryField(const std::string& name, int byteLocation, int width, SEGY::DataSampleFormatCode format) {
@@ -78,30 +38,34 @@ bool SEGYWriter::initialize(const std::string& filename, SEGYWriteInfo writeInfo
 
     try {
         // Open output file in binary mode
-        std::ofstream file(filename, std::ios::binary | std::ios::out | std::ios::trunc);
-        if (!file.is_open()) {
+        m_outputFile.open(filename, std::ios::binary | std::ios::out | std::ios::trunc);
+        if (!m_outputFile.is_open()) {
             m_lastError = "Cannot open file for writing: " + filename;
             return false;
         }
         
         // Write SEGY headers
-        if (!writeTextualHeader(file)) {
+        if (!writeTextualHeader(m_outputFile)) {
             m_lastError = "Failed to write textual header";
             return false;
         }
         
-        if (!writeBinaryHeader(file)) {
+        if (!writeBinaryHeader(m_outputFile)) {
             m_lastError = "Failed to write binary header";
             return false;
         }
 
         int traceCount = m_writeInfo.inlineCount * m_writeInfo.crosslineCount;
         int traceSize = 240 + m_writeInfo.traceByteSize;
+        SEGY::HeaderField field(1, 4, SEGY::DataSampleFormatCode::Int32);
+        int trace_num;
         for(int i = 0; i < traceCount; ++i) {
             // Write empty trace headers and data
             std::vector<char> emptyTraceHeader(traceSize, 0);
-            file.write(emptyTraceHeader.data(), traceSize);
-            if (file.fail()) {
+            trace_num = i + 1;
+            writeFieldToHeader(emptyTraceHeader.data(), &trace_num,field);
+            m_outputFile.write(emptyTraceHeader.data(), traceSize);
+            if (m_outputFile.fail()) {
                 m_lastError = "Failed to write empty trace at index: " + std::to_string(i);
                 return false;
             }            
@@ -111,7 +75,6 @@ bool SEGYWriter::initialize(const std::string& filename, SEGYWriteInfo writeInfo
         m_fileCreated = true;
         
         m_logger->LogInfo(m_log_data, "SEGYWriter initialized for file: {}", filename);
-        file.close();
         return true;
         
     } catch (const std::exception& e) {
@@ -126,12 +89,17 @@ bool SEGYWriter::finalize() {
     return true;
 }
 
-bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslineNum, char* sampleData) {
+bool SEGYWriter::writeTraceData(int inlineNum, int crosslineNum, char* sampleData) {
     if (!m_initialized) {
         m_lastError = "Writer not initialized";
         return false;
     }
-    
+
+    if (!m_outputFile.is_open()) {
+        m_lastError = "outputFile cannot open";
+        return false;
+    }
+
     try {
         // Calculate trace position in file
         int64_t filePosition = calculateFilePosition(inlineNum, crosslineNum);
@@ -144,11 +112,11 @@ bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslin
         filePosition += traceHeaderSize;
 
         // Seek to position and write sample data
-        file.seekp(filePosition, std::ios::beg);
+        m_outputFile.seekp(filePosition, std::ios::beg);
         convertSampleDataForWriting(sampleData);
-        file.write(static_cast<const char*>(sampleData), m_writeInfo.traceByteSize);
+        m_outputFile.write(static_cast<const char*>(sampleData), m_writeInfo.traceByteSize);
         
-        if (file.fail()) {
+        if (m_outputFile.fail()) {
             m_lastError = "Failed to write trace data at position";
             return false;
         }
@@ -161,12 +129,15 @@ bool SEGYWriter::writeTraceData(std::ofstream& file, int inlineNum, int crosslin
     }
 }
 
-bool SEGYWriter::writeTraceHeader(std::ofstream& file, int inlineNum, int crosslineNum, char* data, int offset, int len) {
+bool SEGYWriter::writeTraceHeader(int inlineNum, int crosslineNum, char* data, int offset, int len) {
     if (!m_initialized) {
         m_lastError = "Writer not initialized";
         return false;
     }
-    
+    if (!m_outputFile.is_open()) {
+        m_lastError = "outputFile cannot open";
+        return false;
+    }    
     try {
         // Calculate trace position in file
         int64_t filePosition = calculateFilePosition(inlineNum, crosslineNum);
@@ -187,10 +158,10 @@ bool SEGYWriter::writeTraceHeader(std::ofstream& file, int inlineNum, int crossl
         }
         
         // Seek to position and write trace header
-        file.seekp(filePosition + offset - 1, std::ios::beg);
-        file.write(data, len);
+        m_outputFile.seekp(filePosition + offset - 1, std::ios::beg);
+        m_outputFile.write(data, len);
         
-        if (file.fail()) {
+        if (m_outputFile.fail()) {
             m_lastError = "Failed to write trace header at position";
             return false;
         }
@@ -243,7 +214,8 @@ void SEGYWriter::generateTextualHeader(std::vector<char>& textualHeader) {
 
     while (end != std::string::npos) {
         std::string str = m_writeInfo.textualHeader.substr(start, end - start);
-        std::string line = "C" + std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + " " + str;
+        std::string snum = std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + std::to_string(headerLines.size()+1);
+        std::string line = "C" + snum  + " " + str;
         line.resize(80, ' ');
         headerLines.push_back(line);
         start = end + 1;
@@ -251,7 +223,8 @@ void SEGYWriter::generateTextualHeader(std::vector<char>& textualHeader) {
     }
     if (start < m_writeInfo.textualHeader.length()) {
         std::string str = m_writeInfo.textualHeader.substr(start);
-        std::string line = "C" + std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + " " + str;
+        std::string snum = std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + std::to_string(headerLines.size()+1);
+        std::string line = "C" + snum  + " " + str;
         line.resize(80, ' ');
         headerLines.push_back(line);
     }
@@ -263,7 +236,7 @@ void SEGYWriter::generateTextualHeader(std::vector<char>& textualHeader) {
     }
     
     // Convert all lines to EBCDIC and copy to header buffer
-    for (size_t lineIdx = 0; lineIdx < std::min(headerLines.size(), size_t(40)); ++lineIdx) {
+    for (size_t lineIdx = 0; lineIdx < std::min(headerLines.size(), size_t(40)); ++lineIdx) {        
         const std::string& line = headerLines[lineIdx];
         for (size_t charIdx = 0; charIdx < 80; ++charIdx) {
             char asciiChar = (charIdx < line.length()) ? line[charIdx] : ' ';
@@ -401,6 +374,13 @@ int64_t SEGYWriter::calculateFilePosition(int inlineNum, int crosslineNum) {
     int64_t count =  inline_idx * m_writeInfo.crosslineCount + crossline_idx;
     int traceSize = 240 + m_writeInfo.traceByteSize;
 
-    return count * traceSize;
+    //printf("calculateFilePosition %d, %d, %d, %d, %d, %d\n", inlineNum, inline_idx, crosslineNum, crossline_idx, count, traceSize);
 
+    return count * traceSize + 3600;
+}
+
+void SEGYWriter::finished()
+{ 
+    if(m_outputFile.is_open())
+        m_outputFile.close();
 }
