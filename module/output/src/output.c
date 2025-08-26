@@ -256,6 +256,8 @@ void output_process(const char* myid)
     use_chunks = true;
   }
 
+  use_chunks = false;
+
 #if 0
   const char* attr_name;
   int num_attrs = DF_get_num_attributes();
