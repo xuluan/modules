@@ -78,86 +78,7 @@ void segyoutput_init(const char* myid, const char* buf)
         
         // Get sample interval from data flow
         my_data->sinterval = static_cast<int>(job_df.GetDataSampleRate() * 1000); // Convert to microseconds
-
-        //update 
-        try {
-            int i = segyout_config.at("primary_start", "segyoutput").as_int();
-            if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
-                my_data->fpkey = (i - my_data->lpkey)/my_data->pkinc * my_data->pkinc + my_data->lpkey;
-                gd_logger.LogInfo(my_logger, "my_data->fpkey INPUT: {} UPDATE {}", i, my_data->fpkey);
-            }
-        } catch (const std::exception& e) {
-            gd_logger.LogDebug(my_logger, e.what());
-        }
-
-        try {
-            int i = segyout_config.at("primary_end", "segyoutput").as_int();
-            if((i <= my_data->lpkey) && (i >= my_data->fpkey)) { //valid
-                my_data->lpkey = i;
-                gd_logger.LogInfo(my_logger, "my_data->lpkey INPUT: {} UPDATE {}", i, my_data->lpkey);
-            }
-        } catch (const std::exception& e) {
-            gd_logger.LogDebug(my_logger, e.what());
-        }
-
-        my_data->num_pkey = (my_data->lpkey - my_data->fpkey)/my_data->pkinc + 1;
-
-        try {
-            int i = segyout_config.at("secondary_start", "segyoutput").as_int();
-            if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
-                my_data->fskey = i;
-                gd_logger.LogInfo(my_logger, "my_data->fskey INPUT: {} UPDATE {}", i, my_data->fskey);
-            }
-        } catch (const std::exception& e) {
-            gd_logger.LogDebug(my_logger, e.what());
-        }
-
-        try {
-            int i = segyout_config.at("secondary_end", "segyoutput").as_int();
-            if((i <= my_data->lskey) && (i >= my_data->fskey)) { //valid
-                my_data->lskey = i;
-                gd_logger.LogInfo(my_logger, "my_data->lskey INPUT: {} UPDATE {}", i, my_data->lskey);
-
-            }
-        } catch (const std::exception& e) {
-            gd_logger.LogDebug(my_logger, e.what());
-        }
-        my_data->num_skey = (my_data->lskey - my_data->fskey)/my_data->skinc + 1;
-
-        my_data->trace_start = 0;
-        my_data->trace_end = my_data->trace_length - 1;
-
-        try {
-            int i = segyout_config.at("trace_start", "segyoutput").as_int();
-            if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
-                my_data->trace_start = i;
-                my_data->tmin += my_data->sinterval/ 1000.0 * i;
-                gd_logger.LogInfo(my_logger, "my_data->trace_start INPUT: {} UPDATE {}", i, my_data->trace_start);
-            }
-        } catch (const std::exception& e) {
-            gd_logger.LogDebug(my_logger, e.what());
-        }
-
-        try {
-            int i = segyout_config.at("trace_end", "segyoutput").as_int();
-            if((i <= my_data->trace_end) && (i >= my_data->trace_start)) { //valid
-                my_data->trace_end = i;
-                my_data->tmax = my_data->tmin + (my_data->sinterval/ 1000.0 )*(i - my_data->trace_start);
-                gd_logger.LogInfo(my_logger, "my_data->trace_end INPUT: {} UPDATE {}", i, my_data->trace_end);
-            }
-        } catch (const std::exception& e) {
-            gd_logger.LogDebug(my_logger, e.what());
-        }
-
-        my_data->trace_length = my_data->trace_end - my_data->trace_start + 1;
-        my_data->current_pkey = my_data->fpkey;//todo: implement logic for slice cube
-
-
-        my_data->skeys.clear();
-        for (int i = my_data->fskey; i <= my_data->lskey;) {
-            my_data->skeys.push_back(i);
-            i += my_data->skinc;
-        }
+        my_data->current_pkey = my_data->fpkey;
 
         gd_logger.LogInfo(my_logger, "Primary axis: {} to {} ({} values, inc={})", 
                             my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
@@ -228,6 +149,12 @@ void segyoutput_init(const char* myid, const char* buf)
         write_info.sampleCount = my_data->trace_length;
         write_info.sampleInterval = my_data->sinterval;
         
+        try {
+            write_info.textualHeader = segyout_config.at("textual_header", "segyoutput").as_string();
+        } catch (const std::exception& e) {
+            write_info.textualHeader = "";
+        }
+
         // Calculate trace byte size based on format
         int sample_size = 0;
         switch (segy_format) {
@@ -255,9 +182,6 @@ void segyoutput_init(const char* myid, const char* buf)
         write_info.crosslineCount = my_data->num_skey;
         write_info.primaryStep = my_data->pkinc;
         write_info.secondaryStep = my_data->skinc;
-
-        // Calculate total expected traces
-        my_data->total_expected_traces = static_cast<int64_t>(my_data->num_pkey) * my_data->num_skey;
 
         if(!check_offset(my_data->primary_offset, 4, 240)) {
             throw std::runtime_error("Error: segyoutput the offset of attribute " + my_data->pkey_name + " is invalid: " + std::to_string(my_data->primary_offset));
@@ -344,12 +268,7 @@ void segyoutput_init(const char* myid, const char* buf)
                                     ", Error: " + my_data->segy_writer.getLastError());
         }
         
-        my_data->file_initialized = true;
-        my_data->header_written = true;
-        
-        gd_logger.LogInfo(my_logger, "SEGY writer initialized successfully");
-        gd_logger.LogInfo(my_logger, "Expected total traces: {}", my_data->total_expected_traces);
-            
+        gd_logger.LogInfo(my_logger, "SEGY writer initialized successfully");            
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
 
     } catch (const std::exception& e) {
@@ -382,30 +301,7 @@ void segyoutput_process(const char* myid)
     }
 
     try {        
-        // setup primary and secondary
         int grp_size = job_df.GetGroupSize();
-        int* pkey;
-        pkey = static_cast<int*>(job_df.GetWritableBuffer(job_df.GetPrimaryKeyName()));
-        if(pkey == nullptr) {
-            gd_logger.LogError(my_logger, "DF returned a nullptr to the buffer of pkey is NULL");
-            job_df.SetJobAborted();
-            _clean_up();
-            return;
-        }
-
-        std::fill(pkey, pkey + grp_size, my_data->current_pkey);
-        gd_logger.LogInfo(my_logger, "Process primary key {}\n", pkey[0]);
-
-        int* skey;
-        skey = static_cast<int*>(job_df.GetWritableBuffer(job_df.GetSecondaryKeyName()));
-        if(skey == nullptr) {
-            gd_logger.LogError(my_logger, "DF returned a nullptr to the buffer of skey is NULL");
-            job_df.SetJobAborted();
-            _clean_up();
-            return;
-        }
-
-        std::copy(my_data->skeys.begin(), my_data->skeys.end(), skey);    
 
         std::string data_name = job_df.GetVolumeDataName();
 

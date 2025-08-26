@@ -59,47 +59,12 @@
   "width": "full",
   "help": "Custom textual header content (3200 characters max). If not provided, automatic header will be generated."
 },
-"primary_start":{
+"textual_header":{
   "type": "argument",
   "required": false,
-  "help": "the start of the primary",
-  "format": "int",
-  "width": "default"
-},
-"primary_end":{
-  "type": "argument",
-  "required": false,
-  "help": "the end of the primary",
-  "format": "int",
-  "width": "default"
-},
-"secondary_start":{
-  "type": "argument",
-  "required": false,
-  "help": "the start of the secondary",
-  "format": "int",
-  "width": "default"
-},
-"secondary_end":{
-  "type": "argument",
-  "required": false,
-  "help": "the end of the secondary",
-  "format": "int",
-  "width": "default"
-},
-"trace_start":{
-  "type": "argument",
-  "required": false,
-  "help": "the start number of the trace, default: 0",
-  "format": "int",
-  "width": "default"
-},
-"trace_end":{
-  "type": "argument",
-  "required": false,
-  "help": "the end number of the trace, default: trace_length - 1",
-  "format": "int",
-  "width": "default"
+  "help": "The user-defined section of the textual header will be put into the textual header.",
+  "format": "text",
+  "width": "full"
 },
 "attribute": {
   "required": false,

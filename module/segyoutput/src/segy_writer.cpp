@@ -237,7 +237,24 @@ void SEGYWriter::generateTextualHeader(std::vector<char>& textualHeader) {
     headerLines.push_back("C06                                                                             ");
     headerLines.push_back("C07 Data format: IEEE 32-bit floating point                                    ");
     headerLines.push_back("C08 Coordinate system: Inline/Crossline                                        ");
-    
+
+    size_t start = 0;
+    size_t end = m_writeInfo.textualHeader.find("\n");
+
+    while (end != std::string::npos) {
+        std::string str = m_writeInfo.textualHeader.substr(start, end - start);
+        std::string line = "C" + std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + " " + str;
+        line.resize(80, ' ');
+        headerLines.push_back(line);
+        start = end + 1;
+        end = m_writeInfo.textualHeader.find("\n", start);
+    }
+    if (start < m_writeInfo.textualHeader.length()) {
+        std::string str = m_writeInfo.textualHeader.substr(start);
+        std::string line = "C" + std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + " " + str;
+        line.resize(80, ' ');
+        headerLines.push_back(line);
+    }
     // Fill remaining lines if less than 40 lines provided
     while (headerLines.size() < 40) {
         std::string emptyLine = "C" + std::string(2 - std::to_string(headerLines.size() + 1).length(), '0') + 

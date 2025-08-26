@@ -37,15 +37,6 @@ struct Segyoutput {
     int num_pkey;
     int current_pkey;
     
-    std::vector<int> pkeys;
-    std::vector<int> skeys;
-    
-    // Output-specific fields
-    bool file_initialized;
-    bool header_written;
-    int64_t traces_written;
-    int64_t total_expected_traces;
-    
     void* logger;
 };
 

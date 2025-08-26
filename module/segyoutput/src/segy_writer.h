@@ -44,21 +44,6 @@ namespace SEGY {
         HeaderField(int loc, int width, DataSampleFormatCode type) : byteLocation(loc), fieldWidth(width), fieldType(type) {}
         bool defined() const { return byteLocation != 0; }
     };
-    
-    // Standard SEGY header field definitions
-    namespace BinaryHeader {
-        const HeaderField SampleIntervalHeaderField(17, 2);
-        const HeaderField NumSamplesHeaderField(21, 2);
-        const HeaderField DataSampleFormatCodeHeaderField(25, 2);
-    }
-    
-    namespace TraceHeader {
-        const HeaderField NumSamplesHeaderField(115, 2);
-        const HeaderField SampleIntervalHeaderField(117, 2);
-        const HeaderField InlineNumberHeaderField(189, 4);
-        const HeaderField CrosslineNumberHeaderField(193, 4);
-    }
-    
     // OpenVDS-style ReadFieldFromHeader implementation
     void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
 }
@@ -71,10 +56,10 @@ struct SEGYWriteInfo {
     int sampleInterval;
     int traceByteSize;
     
-    // Coordinate system information
     int minInline, maxInline, inlineCount;
     int minCrossline, maxCrossline, crosslineCount;
     int primaryStep, secondaryStep;
+    std::string textualHeader;
     
 };
 
