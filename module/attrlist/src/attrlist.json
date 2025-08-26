@@ -1,4 +1,12 @@
 "name": "attrlist",
-"version": "1.0.0",
+"version": "1.1.0",
 "use_mpi": false,
-"use_cuda": false
+"use_cuda": false,
+"attributes": {
+  "required": false,
+  "repeatable": true,
+  "type": "argument",
+  "format": "text",
+  "width": "default",  
+  "help": "the name of attribute to list"
+}

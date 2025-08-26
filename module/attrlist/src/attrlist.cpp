@@ -8,6 +8,8 @@
 #include <cmath>
 #include "fort.hpp"
 #include <iostream>
+#include <utl_yaml_parser.h>
+#include <utl_string.h>
 
 
 std::string get_data_type_to_string(as::DataFormat format) {
@@ -59,6 +61,9 @@ void attrlist_init(const char* myid, const char* buf)
         float tmin, tmax;
         int tnums;
 
+        // parse job parameters
+        gutl::DynamicValue config = gutl::parse(buf);
+
         job_df.GetPrimaryKeyAxis(pmin, pmax, pnums);
         job_df.GetSecondaryKeyAxis(smin, smax, snums);
         job_df.GetDataAxis(tmin, tmax, tnums);
@@ -77,23 +82,51 @@ void attrlist_init(const char* myid, const char* buf)
 
         gd_logger.LogInfo(my_logger, "Attribute Group size {}", grp_size);
 
-        for(int i = 0; i< job_df.GetNumAttributes(); i++) {
-            as::DataFormat attr_fmt;
-            int length;
-            float min; 
-            float max;
-            const char * attr_name = job_df.GetAttributeName(i);
-            job_df.GetAttributeInfo(attr_name, attr_fmt, length, min, max);
+        //parse attributes
+        auto& attrs = config["attrlist"]["attributes"];
 
-            gd_logger.LogInfo(my_logger, "Attribute {:2}, Name: {:32}, Type: {:6}, Length: {:10}, Min: {:10}, Max: {:10}"
-                , i, attr_name, get_data_type_to_string(attr_fmt), length, min, max);   
+        if (attrs.is_array()) {
+            auto& arr = attrs.as_array();
+            for (size_t i = 0; i < arr.size(); ++i) {
+                as::DataFormat attr_fmt;
+                int length;
+                float min; 
+                float max;
+                //AttrConfig attr_config;
+                std::string attr_name = arr[i].as_string();
+                gutl::UTL_StringToUpperCase(attr_name);
+
+                if (job_df.HasAttribute(attr_name.c_str()) ) {
+                    job_df.GetAttributeInfo(attr_name.c_str(), attr_fmt, length, min, max);
+
+                    gd_logger.LogInfo(my_logger, "Attribute {:2}, Name: {:32}, Type: {:6}, Length: {:10}, Min: {:10}, Max: {:10}"
+                        , i, attr_name, get_data_type_to_string(attr_fmt), length, min, max);
+
+                } else {
+                    gd_logger.LogWarning(my_logger, "Attribute {:2}, Name: {:32}  cannot found"
+                        , i, attr_name);
+                    throw std::runtime_error("Attribute [" + attr_name + "] cannot found."); 
+                }
+
+            } 
+        } else {
+            // list all attribute if 'attribute' is miss
+
+            for(int i = 0; i< job_df.GetNumAttributes(); i++) {
+                as::DataFormat attr_fmt;
+                int length;
+                float min; 
+                float max;
+                const char * attr_name = job_df.GetAttributeName(i);
+                job_df.GetAttributeInfo(attr_name, attr_fmt, length, min, max);
+
+                gd_logger.LogInfo(my_logger, "Attribute {:2}, Name: {:32}, Type: {:6}, Length: {:10}, Min: {:10}, Max: {:10}"
+                    , i, attr_name, get_data_type_to_string(attr_fmt), length, min, max); 
+            }
+
         }
 
-
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
-
-
-
 
         gd_logger.FlushLog(my_logger);
 
