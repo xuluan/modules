@@ -26,7 +26,7 @@
 "primary_name": {
     "type": "argument",
     "required": false,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "default": "INLINE",
@@ -43,7 +43,7 @@
 "secondary_name": {
     "type": "argument",
     "required": false,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "default": "CROSSLINE",
@@ -60,7 +60,7 @@
 "data_name": {
     "type": "argument",
     "required": false,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "default": "TRACE",
@@ -140,7 +140,7 @@
   "name": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "help": "Name of the attribute"

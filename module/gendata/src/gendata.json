@@ -14,8 +14,8 @@
 "maxtime": {
   "type": "argument",
   "format": "int",
-  "required": true,
-  "repetable": false,
+  "repeatable": true,
+  "repeatable": false,
   "default": 5000,
   "width": "default",
   "help": "The last time of the time axis in milliseconds"
@@ -23,7 +23,7 @@
 "sinterval": {
   "type": "argument",
   "required": true,
-  "repetable": false,
+  "repeatable": false,
   "format": "int",
   "default": 4000,
   "width": "default",
@@ -32,11 +32,11 @@
 "primarykey": {
   "type": "procedure",
   "required": true,
-  "repetable": false,
+  "repeatable": false,
   "name": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "help": "The name of the attribute of the primary key"
@@ -44,7 +44,7 @@
   "first": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "int",
     "default": 1,
     "width": "default",
@@ -53,7 +53,7 @@
   "last": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "int",
     "default": 10,
     "width": "default",
@@ -62,7 +62,7 @@
   "step": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "int",
     "default": 1,
     "width": "default",
@@ -72,11 +72,11 @@
 "secondarykey": {
   "type": "procedure",
   "required": true,
-  "repetable": false,
+  "repeatable": false,
   "name": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "help": "The name of the attribute of the secondary key"
@@ -84,7 +84,7 @@
   "first": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "int",
     "default": 1,
     "width": "default",
@@ -93,7 +93,7 @@
   "last": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "int",
     "default": 100,
     "width": "default",
@@ -102,7 +102,7 @@
   "step": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "int",
     "default": 1,
     "width": "default",
@@ -119,12 +119,12 @@
     "ormsby": {
       "type": "procedure",
       "required": true,
-      "repetable": false,
+      "repeatable": false,
       "help": "Ormsby wavelet",
       "f1": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The low-cut frequency in Hz",
         "formt": "float",
         "default": 5.0
@@ -132,7 +132,7 @@
       "f2": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The low-pass frequency in Hz",
         "formt": "float",
         "default": 10.0
@@ -140,7 +140,7 @@
       "f3": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The high-pass frequency in Hz",
         "formt": "float",
         "default": 40.0
@@ -148,7 +148,7 @@
       "f4": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The high-cut frequency in Hz",
         "formt": "float",
         "default": 45.0
@@ -156,7 +156,7 @@
       "gate": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The time window gate in ms",
         "formt": "int",
         "default": 500
@@ -164,7 +164,7 @@
       "times": {
         "type": "argument",
         "required": true,
-        "repetable": true,
+        "repeatable": true,
         "help": "The center time value of the gate in ms",
         "formt": "int",
         "default": 500
@@ -175,12 +175,12 @@
     "ricker": {
       "type": "procedure",
       "required": true,
-      "repetable": false,
+      "repeatable": false,
       "help": "Ricker wavelet",
       "pfreq": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The peak frequency in Hz",
         "formt": "float",
         "default": 15.0
@@ -188,7 +188,7 @@
       "gate": {
         "type": "argument",
         "required": true,
-        "repetable": false,
+        "repeatable": false,
         "help": "The time window gate in ms",
         "formt": "int",
         "default": 500
@@ -196,7 +196,7 @@
       "times": {
         "type": "argument",
         "required": true,
-        "repetable": true,
+        "repeatable": true,
         "help": "The time value in ms where to add the signal",
         "formt": "int",
         "default": 500

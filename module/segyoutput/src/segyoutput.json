@@ -74,7 +74,7 @@
   "name": {
     "type": "argument",
     "required": true,
-    "repetable": false,
+    "repeatable": false,
     "format": "text",
     "width": "default",
     "help": "Name of the attribute"
