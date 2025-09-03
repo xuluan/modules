@@ -5,10 +5,6 @@
 #include <fstream>
 
 // === Public interface methods ===
-bool Converter::initialize() {
-
-    return true;
-}
 
 void Converter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
 {
@@ -96,50 +92,6 @@ bool Converter::createVdsStore() {
     return true;
 }
 
-bool Converter::convertDataWithSlidingWindow() {
-    m_logger->LogInfo(m_log_data, "Starting sliding window data conversion...");
-
-    // Step 2: Setup sliding windows for all data types
-    if (!setupSlidingWindows()) {
-        return false;
-    }
-    
-    // Step 3: Initialize chunk writers
-    if (!initializeChunkWriters()) {
-        return false;
-    }
-    
-
-
-    int batchStart = 0;
-    int batchEnd = std::min(m_brickSize*2, m_inlineCount);    
-    // Step 4: Process batches until all inlines are completed
-    while (batchStart < m_inlineCount) {
-
-        
-        m_logger->LogInfo(m_log_data, "Processing batch: inlines [{}, {}) ({} inlines)", batchStart, batchEnd, (batchEnd - batchStart));
-        
-        // Process current batch for all channels
-        if (!processBatch(batchStart, batchEnd)) {
-            return false;
-        }
-
-        if(batchEnd >= m_inlineCount) {
-            break;
-        }
-        // Update processed count
-        batchStart += m_brickSize;
-        batchEnd = std::min(batchEnd + m_brickSize, m_inlineCount);
-        //if (!slideAllWindows()) {
-
-
-
-    }
-    
-    m_logger->LogInfo(m_log_data, "Sliding window data conversion completed!");
-    return true;
-}
-
 bool Converter::finalize() {
     m_logger->LogInfo(m_log_data, "Finalizing VDS file...");
     
@@ -151,6 +103,12 @@ bool Converter::finalize() {
         pair.second.reset();
     }
     m_attributeChunkWriters.clear();
+
+    for (auto& pair : m_attributeWindows) {
+        pair.second.reset();
+    }
+
+    m_amplitudeWindow.reset();
     
     if (m_vdsHandler) {
         m_vdsHandler->Close();
@@ -265,68 +223,25 @@ bool Converter::slidingWindows(const std::string& attrName)
     }
 }
 
-bool Converter::loadAmplitudeData(int globalInlineIdx, char* buffer, size_t bufferSize) {
-    int actualInline = m_inlineMin + globalInlineIdx * m_inlineStep;
-    
-    // Direct read into target buffer (zero-copy optimization)
-    //bool success = m_segyReader->readTraceByPriIdx(
-    //    actualInline, 
-    //    m_crosslineMin, 
-    //    m_crosslineMax,
-    //    0, 
-    //    m_sampleCount - 1,
-    //    buffer  // Direct write to target buffer
-    //);
-    //
-    //if (!success) {
-    //    static_cast<gdlog::ModuleLogger*>(m_log_data)->LogError("ERROR: Failed to read amplitude data for inline {}: {}", actualInline, 
-    //              m_segyReader->getErrMsg());
-    //    return false;
-    //}
-    
-    return true;
-}
-
-
-bool Converter::loadAttributeData(const std::string& attrName, int globalInlineIdx, char* buffer, size_t bufferSize) {
-    int actualInline = m_inlineMin + globalInlineIdx * m_inlineStep;
-    
-    //bool success = m_segyReader->readAttrByPriIdx(
-    //    attrName,
-    //    actualInline, 
-    //    m_crosslineMin, 
-    //    m_crosslineMax,
-    //    buffer
-    //);
-    //
-    //if (!success) {
-    //    static_cast<gdlog::ModuleLogger*>(m_log_data)->LogError("ERROR: Failed to read attribute data '{}' for inline {}: {}", attrName, 
-    //              actualInline, m_segyReader->getErrMsg());
-    //    return false;
-    //}
-    
-    return true;
-}
-
 // === Batch processing methods ===
 
-bool Converter::processBatch(int batchStartIdx, int batchEndIdx) {
-    m_logger->LogInfo(m_log_data, "Processing batch: inlines [{}, {})", batchStartIdx, batchEndIdx);
+bool Converter::processBatch(const std::string& attrName, int batchStartIdx, int batchEndIdx) {
+    m_logger->LogInfo(m_log_data, "Processing channel {} batch: inlines [{}, {})", attrName, batchStartIdx, batchEndIdx);
     
     int batchInlineCount = batchEndIdx - batchStartIdx;
-    
-    // Write amplitude data for entire batch
-    if (!writeBatchAmplitudeData(batchStartIdx, batchInlineCount)) {
-        m_logger->LogError(m_log_data, "Failed to write batch amplitude data");
-        return false;
-    }
-    
-    // Write attribute data for entire batch
-    for (const auto& attr : m_attributeFields) {
-        if (!writeBatchAttributeData(attr.name, batchStartIdx, batchInlineCount)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to write batch attribute data '{}'", attr.name);
+
+    if(attrName == "Amplitude") {
+        // Write amplitude data for entire batch
+        return writeBatchAmplitudeData(batchStartIdx, batchInlineCount);
+    } else {
+
+        if(m_attributeWindows.find(attrName) != m_attributeWindows.end()){
+            // Write attribute data for entire batch
+            return writeBatchAttributeData(attrName, batchStartIdx, batchInlineCount);
+        } else {
+            m_logger->LogError(m_log_data, "Error: processBatch cannot find channel {}", attrName);
             return false;
-        }
+        }      
     }
     
     m_logger->LogInfo(m_log_data, "Completed batch processing for all channels");
@@ -338,9 +253,7 @@ bool Converter::processBatch(int batchStartIdx, int batchEndIdx) {
 bool Converter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount) {
     m_logger->LogInfo(m_log_data, "Writing amplitude batch data: start={}, count={}", batchStartIdx, 
               batchInlineCount);
-    //    batchStartIdx = m_amplitudeWindow->getWindowStartIdx();
-    //    batchInlineCount = m_amplitudeWindow->getValidInlineCount();    
-    // Check if window contains required data
+
     if (!m_amplitudeWindow->containsInline(batchStartIdx) || 
         !m_amplitudeWindow->containsInline(batchStartIdx + batchInlineCount - 1)) {
         m_logger->LogError(m_log_data, "Sliding window does not contain required amplitude data for batch");

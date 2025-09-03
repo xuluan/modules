@@ -64,42 +64,13 @@ public:
     int getWindowEndIdx() const { return m_windowEndIdx; }
     int getValidInlineCount() const { return m_validInlineCount; }
     
-    // Check window status
-    bool isEmpty() const { return m_validInlineCount == 0; }
-    bool isFull() const { return m_validInlineCount >= m_windowCapacity; }
-    
     // Check if specified inline is in window
     bool containsInline(int globalInlineIdx) const {
         return globalInlineIdx >= m_windowStartIdx && globalInlineIdx < m_windowEndIdx;
     }
-    
-    // === Data access interface ===
-    
-    // Get raw data pointer for specified inline in window
-    char* getInlineData(int globalInlineIdx) {
-        if (!containsInline(globalInlineIdx)) {
-            return nullptr;
-        }
-        int localOffset = globalInlineIdx - m_windowStartIdx;
-        return m_buffer.data() + localOffset * m_inlineSize;
-    }
-    
-    const char* getInlineData(int globalInlineIdx) const {
-        if (!containsInline(globalInlineIdx)) {
-            return nullptr;
-        }
-        int localOffset = globalInlineIdx - m_windowStartIdx;
-        return m_buffer.data() + localOffset * m_inlineSize;
-    }
-    
-    // Get data pointer at specified position in window (relative to window start)
-    char* getInlineDataByOffset(int offsetInWindow) {
-        if (offsetInWindow < 0 || offsetInWindow >= m_validInlineCount) {
-            return nullptr;
-        }
-        return m_buffer.data() + offsetInWindow * m_inlineSize;
-    }
-    
+
+    // === Public interface methods ===
+
     // Slide operation: move second half data to first half
     bool slide() {
         if (m_validInlineCount < m_brickSize) {
@@ -117,19 +88,15 @@ public:
         
         return true;
     }
-    
-    // Extract specified range data to external buffer (legacy method)
-    bool extractRange(int startGlobalIdx, int count, char* outputBuffer) const {
-        if (!containsInline(startGlobalIdx) || 
-            !containsInline(startGlobalIdx + count - 1)) {
+
+    //fill one inline
+    bool fill(char *data) {
+        //if space enough
+        if (m_validInlineCount >= m_brickSize*2) {
             return false;
         }
-        
-        int localStartOffset = startGlobalIdx - m_windowStartIdx;
-        const char* srcPtr = m_buffer.data() + localStartOffset * m_inlineSize;
-        size_t copySize = count * m_inlineSize;
-        
-        std::memcpy(outputBuffer, srcPtr, copySize);
+        int offset = m_inlineSize * m_validInlineCount;
+        std::memcpy(m_buffer.data() + offset, data, m_inlineSize);
         return true;
     }
     
@@ -147,59 +114,5 @@ public:
         
         return srcPtr;
     }
-    
-    // Validate window data integrity
-    bool validateWindow() const {
-        // Check window state consistency
-        if (m_windowEndIdx < m_windowStartIdx) {
-            return false;
-        }
-        
-        if (m_validInlineCount != (m_windowEndIdx - m_windowStartIdx)) {
-            return false;
-        }
-        
-        if (m_validInlineCount > m_windowCapacity) {
-            return false;
-        }
-        
-        return true;
-    }
 
-
-    //fill one inline
-    bool fill(char *data) {
-        //if space enough
-        if (m_validInlineCount >= m_brickSize*2) {
-            return false;
-        }
-        int offset = m_inlineSize * m_validInlineCount;
-        std::memcpy(m_buffer.data() + offset, data, m_inlineSize);
-        return true;
-    }
-
-
-    
-private:
-    
-    // Calculate memory statistics
-    size_t getTotalMemoryUsage() const {
-        return m_buffer.size();
-    }
-    
-    size_t getUsedMemorySize() const {
-        return m_validInlineCount * m_inlineSize;
-    }
-    
-    // Validate memory access safety
-    bool validateMemoryAccess(int globalInlineIdx, size_t accessSize) const {
-        if (!containsInline(globalInlineIdx)) {
-            return false;
-        }
-        
-        int localOffset = globalInlineIdx - m_windowStartIdx;
-        size_t bufferOffset = localOffset * m_inlineSize;
-        
-        return (bufferOffset + accessSize) <= m_buffer.size();
-    }
 };

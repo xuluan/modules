@@ -251,9 +251,7 @@ void vdsoutput_process(const char* myid)
     };
 
     if (job_df.JobFinished()) {
-
-        //my_data->vds_writer.finished();
-
+        my_data->m_converter->finalize();
         _clean_up();
         return;
     }
@@ -276,10 +274,19 @@ void vdsoutput_process(const char* myid)
                 continue;
             }
 
-            my_data->m_converter->fillSlidingWindows(attr_name, data);
+            if(my_data->m_converter->fillSlidingWindows(attr_name, data)) {
+                throw std::runtime_error("Error: fillSlidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
+
+            }
             if(my_data->batch_num == my_data->brick_size*2 || my_data->batch_end == my_data->num_pkey){
-                my_data->m_converter->processBatch(my_data->batch_start, my_data->batch_end);
-                my_data->m_converter->slidingWindows(attr_name);
+                if(my_data->m_converter->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
+                    throw std::runtime_error("Error: processBatch channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
+                }
+
+                if(my_data->m_converter->slidingWindows(attr_name)) {
+                    throw std::runtime_error("Error: slidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
+
+                }
             }
         }
 

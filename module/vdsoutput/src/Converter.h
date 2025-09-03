@@ -100,7 +100,6 @@ public:
     }
     
     // === Public interface methods ===
-    bool initialize();
     bool createVdsStore();
     bool convertDataWithSlidingWindow();
     bool finalize();
@@ -127,7 +126,7 @@ public:
     bool slidingWindows(const std::string& attrName);
 
     // Process current batch for all channels
-    bool processBatch(int batchStartIdx, int batchEndIdx);        
+    bool processBatch(const std::string& attrName, int batchStartIdx, int batchEndIdx);
 private:
 
     
