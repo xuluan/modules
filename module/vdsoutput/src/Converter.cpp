@@ -4,9 +4,11 @@
 #include <algorithm>
 #include <fstream>
 
-#define ENABLE_ATTR 1
-
 // === Public interface methods ===
+bool Converter::initialize() {
+
+    return true;
+}
 
 void Converter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
 {
@@ -66,7 +68,6 @@ bool Converter::createVdsStore() {
             return false;
         }
 
-#if ENABLE_ATTR           
         // 5. Add attribute channels
         for (const auto& attrField : m_attributeFields) {
             VDSAttributeField vdsAttrField;
@@ -80,23 +81,6 @@ bool Converter::createVdsStore() {
                 return false;
             }
         }
-        
-#endif  
-        // 5.1 Add SEGY Trace Header channel
-        if (m_enableTraceHeader) {
-            VDSAttributeField traceHeaderField;
-            traceHeaderField.name = "SEGYTraceHeader";
-            traceHeaderField.format = OpenVDS::VolumeDataFormat::Format_U8;
-            traceHeaderField.width = 240;
-            traceHeaderField.valueRange = ValueRange(0.0f, 255.0f);
-            
-            if (!m_vdsHandler->AddAttributeChannel(traceHeaderField)) {
-                m_logger->LogError(m_log_data, "ERROR: Failed to add SEGYTraceHeader channel: {}", m_vdsHandler->GetLastError());
-                return false;
-            }
-            m_logger->LogInfo(m_log_data, "Added SEGYTraceHeader channel (240 bytes per trace)");
-        }
-
         // 6. Create VDS file
         if (!m_vdsHandler->CreateVDS()) {
             m_logger->LogError(m_log_data, "Failed to create VDS: {}", m_vdsHandler->GetLastError());
@@ -125,10 +109,7 @@ bool Converter::convertDataWithSlidingWindow() {
         return false;
     }
     
-    // Step 4: Fill all windows initially
-    if (!fillAllSlidingWindows()) {
-        return false;
-    }
+
 
     int batchStart = 0;
     int batchEnd = std::min(m_brickSize*2, m_inlineCount);    
@@ -149,9 +130,8 @@ bool Converter::convertDataWithSlidingWindow() {
         // Update processed count
         batchStart += m_brickSize;
         batchEnd = std::min(batchEnd + m_brickSize, m_inlineCount);
-        if (!slideAllWindows()) {
-            return false;
-        }
+        //if (!slideAllWindows()) {
+
 
 
     }
@@ -166,7 +146,6 @@ bool Converter::finalize() {
     // Reset all ChannelChunkWriter instances
     m_logger->LogInfo(m_log_data, "Cleaning up chunk writers...");
     m_amplitudeChunkWriter.reset();
-    m_traceHeaderChunkWriter.reset();
     
     for (auto& pair : m_attributeChunkWriters) {
         pair.second.reset();
@@ -188,21 +167,14 @@ bool Converter::setupSlidingWindows() {
     
     try {
         // 1. Create amplitude window
-        size_t ampElementSize = getDataSize(m_dataFormat);
+        size_t ampElementSize = getVDSDataSize(m_dataFormat);
         int ampElementNum = m_crosslineCount * m_sampleCount;
         m_amplitudeWindow = std::make_unique<SlidingWindow>(m_brickSize, ampElementSize, ampElementNum);
 
         m_logger->LogInfo(m_log_data, "Created amplitude window: elementSize={}, elementNum={}", 
                   ampElementSize, ampElementNum);
         
-        // 2. Create trace header window
-        if (m_enableTraceHeader) {
-            m_traceHeaderWindow = std::make_unique<SlidingWindow>(m_brickSize, 1, m_crosslineCount * 240);
-            m_logger->LogInfo(m_log_data, "Created trace header window: elementSize=1, elementNum={}", 
-                      m_crosslineCount * 240);
-        }
-        
-        // 3. Create attribute windows
+        // 2. Create attribute windows
         for (const auto& attr : m_attributeFields) {
             size_t attrElementSize = attr.width;
             int attrElementNum = m_crosslineCount;
@@ -236,25 +208,14 @@ bool Converter::initializeChunkWriters() {
         }
         m_logger->LogInfo(m_log_data, "Amplitude chunk writer initialized successfully");
         
-        // 2. Initialize trace header chunk writer
-        if (m_enableTraceHeader) {
-            m_traceHeaderChunkWriter = std::make_unique<ChannelChunkWriter>(m_vdsHandler->GetVDSHandle());
-            if (!m_traceHeaderChunkWriter->Initialize("SEGYTraceHeader",
-                                                    m_inlineCount, m_crosslineCount, 240,
-                                                    m_inlineMin, m_inlineStep,
-                                                    m_crosslineMin, m_crosslineStep)) {
-                m_logger->LogError(m_log_data, "ERROR: Failed to initialize trace header chunk writer: {}", 
-                          m_traceHeaderChunkWriter->GetLastError());
-                return false;
-            }
-            m_logger->LogInfo(m_log_data, "Trace header chunk writer initialized successfully");
-        }
-        
-        // 3. Initialize attribute chunk writers
+        // 2. Initialize attribute chunk writers
         for (const auto& attr : m_attributeFields) {
             auto attrChunkWriter = std::make_unique<ChannelChunkWriter>(m_vdsHandler->GetVDSHandle());
+
+            int sampleCount = attr.width / getVDSDataSize(attr.format);
+            
             if (!attrChunkWriter->Initialize(attr.name.c_str(),
-                                           m_inlineCount, m_crosslineCount, 1,  // Attributes have 1 sample per trace
+                                           m_inlineCount, m_crosslineCount, sampleCount,
                                            m_inlineMin, m_inlineStep,
                                            m_crosslineMin, m_crosslineStep)) {
                 m_logger->LogError(m_log_data, "ERROR: Failed to initialize attribute chunk writer '{}': {}", attr.name, 
@@ -276,89 +237,32 @@ bool Converter::initializeChunkWriters() {
 
 // === Data loading methods ===
 
-bool Converter::fillAllSlidingWindows() {
-    int initialCount = std::min(2 * m_brickSize, m_inlineCount);
-    m_logger->LogInfo(m_log_data, "Filling all sliding windows with initial {} inlines...", initialCount);
-    
-    // Fill amplitude window
-    auto ampLoader = [this](int globalIdx, char* buffer, size_t size) -> bool {
-        return loadAmplitudeData(globalIdx, buffer, size);
-    };
-    
-    if (!m_amplitudeWindow->fillInitial(0, initialCount, ampLoader)) {
-        m_logger->LogError(m_log_data, "Failed to fill amplitude window");
-        return false;
-    }
-    m_logger->LogInfo(m_log_data, "Amplitude window filled successfully");
-    
-    // Fill trace header window
-    if (m_traceHeaderWindow) {
-        auto headerLoader = [this](int globalIdx, char* buffer, size_t size) -> bool {
-            return loadTraceHeaderData(globalIdx, buffer, size);
-        };
-        
-        if (!m_traceHeaderWindow->fillInitial(0, initialCount, headerLoader)) {
-            m_logger->LogError(m_log_data, "Failed to fill trace header window");
+bool Converter::fillSlidingWindows(const std::string& attrName, char *data)
+{
+    if(attrName == "Amplitude") {
+        return m_amplitudeWindow->fill(data);
+    } else {
+        if(m_attributeWindows.find(attrName) != m_attributeWindows.end()){
+            return m_attributeWindows[attrName]->fill(data);
+        } else {
+            m_logger->LogError(m_log_data, "Error: fillSlidingWindows cannot find channel {}", attrName);
             return false;
         }
-        m_logger->LogInfo(m_log_data, "Trace header window filled successfully");
     }
-    
-    // Fill attribute windows
-    for (const auto& attr : m_attributeFields) {
-        auto attrLoader = [this, &attr](int globalIdx, char* buffer, size_t size) -> bool {
-            return loadAttributeData(attr.name, globalIdx, buffer, size);
-        };
-        
-        if (!m_attributeWindows[attr.name]->fillInitial(0, initialCount, attrLoader)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to fill attribute window '{}'", attr.name);
-            return false;
-        }
-        m_logger->LogInfo(m_log_data, "Attribute window '{}' filled successfully", attr.name);
-    }
-    
-    return true;
 }
 
-bool Converter::slideAllWindows() {
-    m_logger->LogInfo(m_log_data, "Sliding all windows...");
-    
-    // Slide amplitude window
-    auto ampLoader = [this](int globalIdx, char* buffer, size_t size) -> bool {
-        return loadAmplitudeData(globalIdx, buffer, size);
-    };
-    
-    if (!m_amplitudeWindow->slide(m_inlineCount, ampLoader)) {
-        m_logger->LogError(m_log_data, "Failed to slide amplitude window");
-        return false;
-    }
-    
-    // Slide trace header window
-    if (m_traceHeaderWindow) {
-        auto headerLoader = [this](int globalIdx, char* buffer, size_t size) -> bool {
-            return loadTraceHeaderData(globalIdx, buffer, size);
-        };
-        
-        if (!m_traceHeaderWindow->slide(m_inlineCount, headerLoader)) {
-            m_logger->LogError(m_log_data, "Failed to slide trace header window");
+bool Converter::slidingWindows(const std::string& attrName)
+{
+    if(attrName == "Amplitude") {
+        return m_amplitudeWindow->slide();
+    } else {
+        if(m_attributeWindows.find(attrName) != m_attributeWindows.end()){
+            return m_attributeWindows[attrName]->slide();
+        } else {
+            m_logger->LogError(m_log_data, "Error: fillSlidingWindows cannot find channel {}", attrName);
             return false;
         }
     }
-    
-    // Slide attribute windows
-    for (const auto& attr : m_attributeFields) {
-        auto attrLoader = [this, &attr](int globalIdx, char* buffer, size_t size) -> bool {
-            return loadAttributeData(attr.name, globalIdx, buffer, size);
-        };
-        
-        if (!m_attributeWindows[attr.name]->slide(m_inlineCount, attrLoader)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to slide attribute window '{}'", attr.name);
-            return false;
-        }
-    }
-    
-    m_logger->LogInfo(m_log_data, "All windows slid successfully");
-    return true;
 }
 
 bool Converter::loadAmplitudeData(int globalInlineIdx, char* buffer, size_t bufferSize) {
@@ -383,24 +287,6 @@ bool Converter::loadAmplitudeData(int globalInlineIdx, char* buffer, size_t buff
     return true;
 }
 
-bool Converter::loadTraceHeaderData(int globalInlineIdx, char* buffer, size_t bufferSize) {
-    int actualInline = m_inlineMin + globalInlineIdx * m_inlineStep;
-    
-    //bool success = m_segyReader->readSEGYTraceHeaderByPriIdx(
-    //    actualInline, 
-    //    m_crosslineMin, 
-    //    m_crosslineMax,
-    //    buffer
-    //);
-    //
-    //if (!success) {
-    //    static_cast<gdlog::ModuleLogger*>(m_log_data)->LogError("ERROR: Failed to read trace header data for inline {}: {}", actualInline, 
-    //              m_segyReader->getErrMsg());
-    //    return false;
-    //}
-    
-    return true;
-}
 
 bool Converter::loadAttributeData(const std::string& attrName, int globalInlineIdx, char* buffer, size_t bufferSize) {
     int actualInline = m_inlineMin + globalInlineIdx * m_inlineStep;
@@ -432,12 +318,6 @@ bool Converter::processBatch(int batchStartIdx, int batchEndIdx) {
     // Write amplitude data for entire batch
     if (!writeBatchAmplitudeData(batchStartIdx, batchInlineCount)) {
         m_logger->LogError(m_log_data, "Failed to write batch amplitude data");
-        return false;
-    }
-    
-    // Write trace header data for entire batch  
-    if (m_traceHeaderWindow && !writeBatchTraceHeaderData(batchStartIdx, batchInlineCount)) {
-        m_logger->LogError(m_log_data, "Failed to write batch trace header data");
         return false;
     }
     
@@ -482,7 +362,7 @@ bool Converter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount)
             return false;
         }
         
-        size_t elementSize = getDataSize(m_dataFormat);
+        size_t elementSize = getVDSDataSize(m_dataFormat);
 
         if (!m_amplitudeChunkWriter->WriteBatchData(batchDataPtr, batchDataSize, 
                                                   batchStartIdx, batchInlineCount, elementSize)) {
@@ -499,46 +379,6 @@ bool Converter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount)
     }
 }
 
-bool Converter::writeBatchTraceHeaderData(int batchStartIdx, int batchInlineCount) {
-    m_logger->LogInfo(m_log_data, "Writing trace header batch data: start={}, count={}", batchStartIdx, 
-              batchInlineCount);
-    
-    // Check if window contains required data
-    if (!m_traceHeaderWindow->containsInline(batchStartIdx) || 
-        !m_traceHeaderWindow->containsInline(batchStartIdx + batchInlineCount - 1)) {
-        m_logger->LogError(m_log_data, "Sliding window does not contain required trace header data for batch");
-        return false;
-    }
-    
-    // Get direct pointer to batch data (zero-copy)
-    size_t batchDataSize;
-    const char* batchDataPtr = m_traceHeaderWindow->getRangePointer(batchStartIdx, batchInlineCount, batchDataSize);
-    if (!batchDataPtr) {
-        m_logger->LogError(m_log_data, "Failed to get trace header batch data pointer");
-        return false;
-    }
-    
-    // Write batch data using member ChannelChunkWriter
-    try {
-        if (!m_traceHeaderChunkWriter) {
-            m_logger->LogError(m_log_data, "Trace header chunk writer not initialized");
-            return false;
-        }
-        
-        if (!m_traceHeaderChunkWriter->WriteBatchData(batchDataPtr, batchDataSize, 
-                                                    batchStartIdx, batchInlineCount, 1)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to write trace header batch data: {}", 
-                      m_traceHeaderChunkWriter->GetLastError());
-            return false;
-        }
-        
-        return true;
-        
-    } catch (const std::exception& e) {
-        m_logger->LogError(m_log_data, "Exception writing trace header batch: {}", e.what());
-        return false;
-    }
-}
 
 bool Converter::writeBatchAttributeData(const std::string& attrName, int batchStartIdx, int batchInlineCount) {
     m_logger->LogInfo(m_log_data, "Writing attribute '{}' batch data: start={}, count={}", attrName, batchStartIdx, 
@@ -604,16 +444,14 @@ bool Converter::writeBatchAttributeData(const std::string& attrName, int batchSt
 
 // === Utility methods ===
 
-void Converter::addAttributeField(const std::string& name, int byteLocation, int width, OpenVDS::VolumeDataFormat format) {
+void Converter::addAttributeField(const std::string& name, int width, OpenVDS::VolumeDataFormat format) {
     //m_segyReader->addAttrField(name, byteLocation, width, format);
     
     AttributeFieldInfo attrInfo;
     attrInfo.name = name;
-    attrInfo.byteLocation = byteLocation;
     attrInfo.width = width;
     attrInfo.format = format;
-    
-    // Set reasonable value ranges
+
     switch(format) {
         case OpenVDS::VolumeDataFormat::Format_U8:
             attrInfo.valueRange = ValueRange(-128.0f, 127.0f);
@@ -633,19 +471,8 @@ void Converter::addAttributeField(const std::string& name, int byteLocation, int
     }
     
     m_attributeFields.push_back(attrInfo);
-    m_logger->LogInfo(m_log_data, "Registered attribute field: {} at byte {}, width={}, format={}, range=[{}, {}]", name, byteLocation,
+    m_logger->LogInfo(m_log_data, "Registered attribute field: {}, width={}, format={}, range=[{}, {}]", name,
               width, static_cast<int>(format), attrInfo.valueRange.min, attrInfo.valueRange.max);
 }
 
-size_t Converter::getDataSize(OpenVDS::VolumeDataFormat format) {
-    switch(format) {
-        case OpenVDS::VolumeDataFormat::Format_U8:      return 1;
-        case OpenVDS::VolumeDataFormat::Format_U16:     return 2;
-        case OpenVDS::VolumeDataFormat::Format_U32:     return 4;
-        case OpenVDS::VolumeDataFormat::Format_R32:     return 4;
-        case OpenVDS::VolumeDataFormat::Format_R64:     return 8;
-        case OpenVDS::VolumeDataFormat::Format_U64:     return 8;
-        default: return 4; // Default to float
-    }
-}
 

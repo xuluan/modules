@@ -35,10 +35,13 @@ struct Vdsoutput {
     float tmax;
     int num_skey;
     int num_pkey;
-    int current_pkey;
+    int current_pkey_index;
+    int batch_start;
+    int batch_end;
+    int batch_num;
 
 
-    std::vector<std::string> attributes;
+    std::map<std::string, AttributeFieldInfo> attributes;
     OpenVDS::CompressionMethod compression_method;
     float tolerance;
     int lod_levels;

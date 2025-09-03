@@ -13,6 +13,26 @@
 #include <GdLogger.h>
 
 
+// Attribute field information storage
+struct AttributeFieldInfo {
+    std::string name;
+    int width;
+    OpenVDS::VolumeDataFormat format;
+    ValueRange valueRange;
+};
+
+size_t getVDSDataSize(OpenVDS::VolumeDataFormat format) {
+    switch(format) {
+        case OpenVDS::VolumeDataFormat::Format_U8:      return 1;
+        case OpenVDS::VolumeDataFormat::Format_U16:     return 2;
+        case OpenVDS::VolumeDataFormat::Format_U32:     return 4;
+        case OpenVDS::VolumeDataFormat::Format_R32:     return 4;
+        case OpenVDS::VolumeDataFormat::Format_R64:     return 8;
+        case OpenVDS::VolumeDataFormat::Format_U64:     return 8;
+        default: return 4; // Default to float
+    }
+}
+
 
 /**
  * SEGY to VDS converter using sliding window approach
@@ -23,18 +43,10 @@ private:
     std::string m_outputFile;
     std::unique_ptr<VDSHandler> m_vdsHandler;
     
-    // Attribute field information storage
-    struct AttributeFieldInfo {
-        std::string name;
-        int byteLocation;
-        int width;
-        OpenVDS::VolumeDataFormat format;
-        ValueRange valueRange;
-    };
+
     std::vector<AttributeFieldInfo> m_attributeFields;
     
     // SEGY Trace Header control
-    bool m_enableTraceHeader = true;
     static const size_t TRACE_HEADER_SIZE = 240;
     
     // SEGY parameters
@@ -60,12 +72,10 @@ private:
     
     // Sliding windows for different data types
     std::unique_ptr<SlidingWindow> m_amplitudeWindow;
-    std::unique_ptr<SlidingWindow> m_traceHeaderWindow;
     std::map<std::string, std::unique_ptr<SlidingWindow>> m_attributeWindows;
     
     // ChannelChunkWriter instances for different channels
     std::unique_ptr<ChannelChunkWriter> m_amplitudeChunkWriter;
-    std::unique_ptr<ChannelChunkWriter> m_traceHeaderChunkWriter;
     std::map<std::string, std::unique_ptr<ChannelChunkWriter>> m_attributeChunkWriters;
     
     // Processing state
@@ -90,7 +100,7 @@ public:
     }
     
     // === Public interface methods ===
-
+    bool initialize();
     bool createVdsStore();
     bool convertDataWithSlidingWindow();
     bool finalize();
@@ -98,50 +108,33 @@ public:
     void SetPrimaryKeyAxis(int min_val, int max_val, int num_vals);
     void SetSecondaryKeyAxis(int min_val, int max_val, int num_vals);
     void SetDataAxis(float min_val, float max_val, int num_vals);    
-private:
-    // === Initialization methods ===
-    
+
+    // Add attribute field
+    void addAttributeField(const std::string& name, int width, OpenVDS::VolumeDataFormat format);
+
     // Setup sliding windows for all data types
     bool setupSlidingWindows();
-    
+
     // Initialize VDS chunk writers for all channels
     bool initializeChunkWriters();
-    
-    // === Data loading methods ===
-    
-    // Fill all sliding windows initially
-    bool fillAllSlidingWindows();
-    
-    // Slide all windows for next batch
-    bool slideAllWindows();
-    
+
     // Data loader functions for different types
     bool loadAmplitudeData(int globalInlineIdx, char* buffer, size_t bufferSize);
-    bool loadTraceHeaderData(int globalInlineIdx, char* buffer, size_t bufferSize);
     bool loadAttributeData(const std::string& attrName, int globalInlineIdx, char* buffer, size_t bufferSize);
-    
-    // === Batch processing methods ===
-    
+
+    bool fillSlidingWindows(const std::string& attrName, char *data);
+
+    bool slidingWindows(const std::string& attrName);
+
     // Process current batch for all channels
-    bool processBatch(int batchStartIdx, int batchEndIdx);
-    
-    // === Channel-specific batch writing ===
+    bool processBatch(int batchStartIdx, int batchEndIdx);        
+private:
+
     
     // Write amplitude data for batch
     bool writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount);
     
-    // Write trace header data for batch
-    bool writeBatchTraceHeaderData(int batchStartIdx, int batchInlineCount);
-    
     // Write attribute data for batch
     bool writeBatchAttributeData(const std::string& attrName, int batchStartIdx, int batchInlineCount);
-    
-    // === Utility methods ===
-    
-    // Add attribute field
-    void addAttributeField(const std::string& name, int byteLocation, int width, OpenVDS::VolumeDataFormat format);
-
-    // Get data size for format
-    size_t getDataSize(OpenVDS::VolumeDataFormat format);
 
 };

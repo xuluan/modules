@@ -100,54 +100,20 @@ public:
         return m_buffer.data() + offsetInWindow * m_inlineSize;
     }
     
-    // === Window operation interface ===
-    
-    // Initial fill - external provides data loading function
-    template<typename DataLoader>
-    bool fillInitial(int startGlobalIdx, int count, DataLoader loader) {
-        if (count > m_windowCapacity) {
+    // Slide operation: move second half data to first half
+    bool slide() {
+        if (m_validInlineCount < m_brickSize) {
             return false;
         }
         
-        for (int i = 0; i < count; ++i) {
-            char* targetPtr = m_buffer.data() + i * m_inlineSize;
-            if (!loader(startGlobalIdx + i, targetPtr, m_inlineSize)) {
-                return false;
-            }
-        }
+        size_t moveSize = m_brickSize * m_inlineSize;
+        char* srcPtr = m_buffer.data() + moveSize;
         
-        m_windowStartIdx = startGlobalIdx;
-        m_windowEndIdx = startGlobalIdx + count;
-        m_validInlineCount = count;
-        return true;
-    }
-    
-    // Slide window - discard first brickSize, read new brickSize
-    template<typename DataLoader>
-    bool slide(int totalInlineCount, DataLoader loader) {
-        // Step 1: Move existing data
-        if (!slideInternal()) {
-            return false;
-        }
+        std::memmove(m_buffer.data(), srcPtr, moveSize);
         
-        // Step 2: Read new data
-        int newStartIdx = m_windowStartIdx + m_brickSize;
-        int newCount = std::min(m_brickSize, totalInlineCount - newStartIdx);
-
-        
-        if (newCount > 0) {
-            for (int i = 0; i < newCount; ++i) {
-                char* targetPtr = m_buffer.data() + (m_brickSize + i) * m_inlineSize;
-                if (!loader(newStartIdx + i, targetPtr, m_inlineSize)) {
-                    return false;
-                }
-            }
-            
-            m_validInlineCount += newCount;
-            m_windowEndIdx = newStartIdx + newCount;
-        }else {
-            return false;
-        }
+        // Update window state
+        m_windowStartIdx += m_brickSize;
+        m_validInlineCount = m_brickSize;
         
         return true;
     }
@@ -199,25 +165,22 @@ public:
         
         return true;
     }
-    
-private:
-    // Internal slide operation: move second half data to first half
-    bool slideInternal() {
-        if (m_validInlineCount < m_brickSize) {
+
+
+    //fill one inline
+    bool fill(char *data) {
+        //if space enough
+        if (m_validInlineCount >= m_brickSize*2) {
             return false;
         }
-        
-        size_t moveSize = m_brickSize * m_inlineSize;
-        char* srcPtr = m_buffer.data() + moveSize;
-        
-        std::memmove(m_buffer.data(), srcPtr, moveSize);
-        
-        // Update window state
-        m_windowStartIdx += m_brickSize;
-        m_validInlineCount = m_brickSize;
-        
+        int offset = m_inlineSize * m_validInlineCount;
+        std::memcpy(m_buffer.data() + offset, data, m_inlineSize);
         return true;
     }
+
+
+    
+private:
     
     // Calculate memory statistics
     size_t getTotalMemoryUsage() const {

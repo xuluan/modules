@@ -105,23 +105,11 @@ void vdsoutput_init(const char* myid, const char* buf)
         } catch (const std::exception& e) {
             my_data->tolerance = 0.01;
         }
-
-
-        auto& attrs = config["vdsoutput"]["attributes"];
-        if(attrs.is_array()) {
-            auto& arr = config["vdsoutput"]["attributes"].as_array();
-            for (size_t i = 0; i < arr.size(); ++i) {
-                auto& attr = arr[i];
-                std::string name = attr.at("name", "attribute").as_string();
-                gutl::UTL_StringToUpperCase(name);
-                my_data->attributes.push_back(name);
-            }
-        }
         
         // Get data flow information to configure VDS writer
         my_data->pkey_name = job_df.GetPrimaryKeyName();
         my_data->skey_name = job_df.GetSecondaryKeyName();
-        my_data->trace_name = job_df.GetVolumeDataName();
+        my_data->trace_name = "Amplitude"; //using vds channle name instead of job_df.GetVolumeDataName();
         
         gd_logger.LogInfo(my_logger, "Primary key: {}, Secondary key: {}, Trace data: {}", 
                             my_data->pkey_name, my_data->skey_name, my_data->trace_name);
@@ -137,7 +125,10 @@ void vdsoutput_init(const char* myid, const char* buf)
         
         // Get sample interval from data flow
         my_data->sinterval = (my_data->tmax - my_data->tmin) * 1000 /(my_data->trace_length - 1);
-        my_data->current_pkey = my_data->fpkey;
+        my_data->current_pkey_index = 0;
+        my_data->batch_start = 0;
+        my_data->batch_end = 0;
+        my_data->batch_num = 0;
 
         gd_logger.LogInfo(my_logger, "Primary axis: {} to {} ({} values, inc={})", 
                             my_data->fpkey, my_data->lpkey, my_data->num_pkey, my_data->pkinc);
@@ -155,9 +146,81 @@ void vdsoutput_init(const char* myid, const char* buf)
 
         my_data->m_converter = std::make_unique<Converter>(my_data->url, my_data->brick_size, my_data->lod_levels,
             my_data->compression_method, my_data->tolerance, convert_dataformat_to_vds(trace_format));
-            if(!my_data->m_converter->createVdsStore()) {
-                throw std::runtime_error("Error: createVdsStore failed!");
+
+
+        auto& attrs = config["vdsoutput"]["attributes"];
+        if(attrs.is_array()) {
+            auto& arr = config["vdsoutput"]["attributes"].as_array();
+            for (size_t i = 0; i < arr.size(); ++i) {
+                
+                auto& attr = arr[i];
+                std::string name = attr.at("name", "attribute").as_string();
+                gutl::UTL_StringToUpperCase(name);
+                if(name == my_data->pkey_name || name == my_data->skey_name || name == my_data->trace_name){
+                    continue;
+                }
+
+                bool is_found = false;
+
+                for(int i = 0; i < job_df.GetNumAttributes(); i++) {
+
+                    if(name == job_df.GetAttributeName(i)){
+                        is_found = true;
+                        break;
+                    }
+                }
+
+                if(is_found) {
+                    AttributeFieldInfo field;
+                    as::DataFormat format;
+                    field.name = name;
+                    job_df.GetAttributeInfo(name.c_str(), format, field.width, min_val, max_val);
+                    field.format = convert_dataformat_to_vds(format);
+                    field.width *= getVDSDataSize(field.format);
+                    my_data->attributes.insert(std::make_pair(name, field));
+                    my_data->m_converter->addAttributeField(name, field.width, field.format);
+                    gd_logger.LogInfo(my_logger, "Add Channel: {} ", name);
+
+                }
+            }           
+
+        } else { // no attributes in config, add all attributes
+
+            for(int i = 0; i < job_df.GetNumAttributes(); i++) {
+
+                std::string name = job_df.GetAttributeName(i);
+
+                if(name == my_data->pkey_name || name == my_data->skey_name || name == my_data->trace_name){
+                    continue;
+                }
+                AttributeFieldInfo field;
+                as::DataFormat format;
+                field.name = name;
+                job_df.GetAttributeInfo(my_data->trace_name.c_str(), format, field.width, min_val, max_val);
+                field.format = convert_dataformat_to_vds(format);
+                field.width *= getVDSDataSize(field.format);
+                my_data->attributes.insert(std::make_pair(name, field));
+                my_data->m_converter->addAttributeField(name, field.width, field.format);   
+                gd_logger.LogInfo(my_logger, "Add Channel: {} ", name);
+
             }
+
+        }
+
+        //create vds
+        if(!my_data->m_converter->createVdsStore()) {
+            throw std::runtime_error("Error: createVdsStore failed!");
+        }
+
+        //Setup sliding windows for all data types
+        if (!my_data->m_converter->setupSlidingWindows()) {
+            throw std::runtime_error("Error: setupSlidingWindows failed!");
+        }
+
+        //Initialize chunk writers
+        if (!my_data->m_converter->initializeChunkWriters()) {
+            throw std::runtime_error("Error: initialize ChunkWriters failed!");
+        }
 
 
         gd_logger.LogInfo(my_logger, "VDS writer initialized successfully");            
@@ -199,39 +262,25 @@ void vdsoutput_process(const char* myid)
         int grp_size = job_df.GetGroupSize();
 
         std::string data_name = job_df.GetVolumeDataName();
-
+        my_data->batch_end++;
+        my_data->batch_num++;
         //write data: primary, secondary, trace and attributes
         for(int i = 0; i < job_df.GetNumAttributes(); i++) {
 
             std::string attr_name = job_df.GetAttributeName(i);
-
             char *data = static_cast<char*>(job_df.GetWritableBuffer(attr_name.c_str()));
-            int bytesize = 1024;// my_data->vds_writer.getTraceByteSize();
             if(data == nullptr) {
                 throw std::runtime_error("DF returned a nullptr to the buffer of attribute: " + attr_name);
             }
-
-            //VDS::HeaderField field = my_data->vds_writer.getTraceField(attr_name);
-            //if (field.defined()) {
-            //    bytesize =  field.fieldWidth;
-            //}
-            //printf("attr %s, %d %d\n", attr_name.c_str(), bytesize, field.byteLocation);
-#if 0//
-            for(int j = my_data->fskey; j <= my_data->lskey; j+=my_data->skinc) {
-                if(attr_name == data_name) {
-                    if(!my_data->vds_writer.writeTraceData(my_data->current_pkey, j, data)) {
-                        throw std::runtime_error("Error: write trace, primary: " + std::to_string(i)
-                            + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->vds_writer.getErrMsg());
-                    }
-                } else {
-                    if(!my_data->vds_writer.writeTraceHeader(my_data->current_pkey, j, data, field.byteLocation, field.fieldWidth)) {
-                        throw std::runtime_error("Error: write trace, primary: " + std::to_string(i) 
-                            + ", secondary: "+ std::to_string(j) + ", error:"  + my_data->vds_writer.getErrMsg());
-                    }
-                }
-                data += bytesize;
+            if(attr_name == my_data->pkey_name || attr_name == my_data->skey_name) {
+                continue;
             }
-#endif
+
+            my_data->m_converter->fillSlidingWindows(attr_name, data);
+            if(my_data->batch_num == my_data->brick_size*2 || my_data->batch_end == my_data->num_pkey){
+                my_data->m_converter->processBatch(my_data->batch_start, my_data->batch_end);
+                my_data->m_converter->slidingWindows(attr_name);
+            }
         }
 
         //file.close();      
@@ -241,6 +290,11 @@ void vdsoutput_process(const char* myid)
         _clean_up();
         return;
     }
+
+    if(my_data->batch_num == my_data->brick_size*2) {
+        my_data->batch_start += my_data->brick_size;
+        my_data->batch_num -= my_data->brick_size;
+    }
     // prepare for the next call
-    my_data->current_pkey = my_data->current_pkey + my_data->pkinc;
+    my_data->current_pkey_index++;
 }
