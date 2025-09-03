@@ -1,0 +1,58 @@
+"name": "vdsoutput",
+"version": "1.0.0",
+"use_mpi": false,
+"use_cuda": false,
+"url": {
+  "type": "argument",
+  "required": true,
+  "format": "text",
+  "default": "",
+  "help": "The full path where the VDS output file will be created, ie, /full/path/to/the/output_data.vds",
+  "width": "full",
+  "button": "save-file",
+  "filefilter": "*.vds"
+},
+"brick_size":{
+  "type": "argument",
+  "required": false,
+  "help": "Set brick size of VDS chunks (default: 64)",
+  "format": "int",
+  "default": "64",
+  "width": "default"
+},
+"compression": {
+  "type": "choice",
+  "required": true,
+  "help": "Set VDS compression method (none, wavelet and zip, default: none)",
+  "format": "text",
+  "default": "none",
+  "options": [
+    "none",
+    "wavelet",
+    "zip"
+  ]
+},
+"tolerance":{
+  "type": "argument",
+  "required": false,
+  "help": "Set VDS compression tolerance, it takes effect only when the compression method is wavelet. (default: 0.01)",
+  "format": "float",
+  "default": "0.01",
+  "width": "default"
+},
+"lod_levels":{
+  "type": "argument",
+  "required": false,
+  "help": "Set VDS LOD levels (default: 0)",
+  "format": "int",
+  "default": "0",
+  "width": "default"
+},
+"attributes": {
+  "required": false,
+  "repeatable": true,
+  "type": "The attribute name that needs to be saved to the channel in VDS file; if not set, all current attributes will be saved.",
+  "help": "Name of the attribute",
+  "format": "text",
+  "width": "default",
+}
