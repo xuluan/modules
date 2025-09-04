@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module management tool: list modules and their versions, or build and install modules.
+Module management tool: list modules and their versions, build and install modules, or clean build artifacts.
 
 Usage:
     # List modules
@@ -15,6 +15,12 @@ Usage:
     python module_manager.py --build --modules attrcalc  # Build specific module
     python module_manager.py -b -m attrcalc gendata      # Build multiple modules
     python module_manager.py -b -m attrcalc --no-confirm # Build without confirmation
+    
+    # Clean build artifacts
+    python module_manager.py --clean                     # Clean all modules
+    python module_manager.py -c                          # Clean all modules (short form)
+    python module_manager.py --clean --modules attrcalc  # Clean specific module
+    python module_manager.py -c -m attrcalc gendata      # Clean multiple modules
 
 Functions Overview:
     Version-related functions:
@@ -34,11 +40,16 @@ Functions Overview:
     - build_single_module(): Build and install a single module
     - build_modules(): Build and install multiple modules
     
+    Clean-related functions:
+    - clean_single_module(): Clean build artifacts for a single module
+    - clean_modules(): Clean build artifacts for multiple modules
+    
     UI and utility functions:
     - create_argument_parser(): Configure command line argument parser
     - get_modules_directory(): Get modules directory path
     - print_scan_header(): Print scan operation header
     - print_build_header(): Print build operation header
+    - print_clean_header(): Print clean operation header
     - print_results_table(): Print results in formatted table
     - print_summary(): Print summary statistics
     - handle_no_modules_found(): Handle no modules found case
@@ -463,6 +474,127 @@ def build_modules(modules_dir, target_modules=None):
     return build_results
 
 
+def clean_single_module(module_dir, module_name):
+    """
+    Clean build artifacts for a single module.
+    
+    Args:
+        module_dir: Path to the module directory
+        module_name: Name of the module
+        
+    Returns:
+        Boolean indicating success
+    """
+    print(f"\n{'='*60}")
+    print(f"🧹 Cleaning module: {module_name}")
+    print(f"📁 Module directory: {module_dir}")
+    
+    success = True
+    items_cleaned = 0
+    
+    # Clean mybuild directory
+    mybuild_dir = module_dir / "mybuild"
+    if mybuild_dir.exists():
+        try:
+            print(f"🗑️  Removing mybuild directory: {mybuild_dir}")
+            import shutil
+            shutil.rmtree(mybuild_dir)
+            print(f"✅ Successfully removed mybuild directory")
+            items_cleaned += 1
+        except Exception as e:
+            print(f"❌ Failed to remove mybuild directory: {e}")
+            success = False
+    else:
+        print(f"ℹ️  mybuild directory not found (already clean)")
+    
+    # Clean compile_commands.json file
+    compile_commands_file = module_dir / "compile_commands.json"
+    if compile_commands_file.exists():
+        try:
+            print(f"🗑️  Removing compile_commands.json file: {compile_commands_file}")
+            compile_commands_file.unlink()
+            print(f"✅ Successfully removed compile_commands.json")
+            items_cleaned += 1
+        except Exception as e:
+            print(f"❌ Failed to remove compile_commands.json: {e}")
+            success = False
+    else:
+        print(f"ℹ️  compile_commands.json not found (already clean)")
+    
+    if success:
+        if items_cleaned > 0:
+            print(f"🎉 Module {module_name} cleaned successfully! ({items_cleaned} items removed)")
+        else:
+            print(f"✨ Module {module_name} was already clean")
+    else:
+        print(f"⚠️  Module {module_name} cleaning completed with errors")
+    
+    return success
+
+
+def clean_modules(modules_dir, target_modules=None):
+    """
+    Clean build artifacts for multiple modules.
+    
+    Args:
+        modules_dir: Path to the modules directory
+        target_modules: List of specific module names to clean, or None for all
+        
+    Returns:
+        Dictionary mapping module names to clean success status
+    """
+    module_dirs = get_all_module_directories(modules_dir)
+    
+    if not module_dirs:
+        return {}
+    
+    # Filter modules based on target_modules
+    modules_to_clean = []
+    for module_dir, module_name in module_dirs:
+        if should_process_module(module_name, target_modules):
+            modules_to_clean.append((module_dir, module_name))
+    
+    if not modules_to_clean:
+        return {}
+    
+    clean_results = {}
+    successful_cleans = 0
+    failed_cleans = 0
+    
+    print(f"\n🧹 Starting clean process for {len(modules_to_clean)} module(s)")
+    
+    for module_dir, module_name in sorted(modules_to_clean, key=lambda x: x[1]):
+        success = clean_single_module(module_dir, module_name)
+        clean_results[module_name] = success
+        
+        if success:
+            successful_cleans += 1
+        else:
+            failed_cleans += 1
+    
+    # Print final summary
+    print(f"\n{'='*60}")
+    print(f"📊 CLEAN SUMMARY")
+    print(f"{'='*60}")
+    print(f"✅ Successful cleans: {successful_cleans}")
+    print(f"❌ Failed cleans: {failed_cleans}")
+    print(f"📋 Total modules processed: {len(clean_results)}")
+    
+    if successful_cleans > 0:
+        print(f"\n✨ Successfully cleaned modules:")
+        for module_name, success in sorted(clean_results.items()):
+            if success:
+                print(f"  ✅ {module_name}")
+    
+    if failed_cleans > 0:
+        print(f"\n💥 Clean failures:")
+        for module_name, success in sorted(clean_results.items()):
+            if not success:
+                print(f"  ❌ {module_name}")
+    
+    return clean_results
+
+
 def create_argument_parser():
     """
     Create and configure the command line argument parser.
@@ -471,7 +603,7 @@ def create_argument_parser():
         ArgumentParser configured for the script
     """
     parser = argparse.ArgumentParser(
-        description="Manage modules: list versions or build and install modules.",
+        description="Manage modules: list versions, build and install modules, or clean build artifacts.",
         epilog="Examples:\n"
                "  %(prog)s --list                           # List all modules\n"
                "  %(prog)s --list --modules attrcalc        # List specific module\n"
@@ -479,8 +611,12 @@ def create_argument_parser():
                "  %(prog)s --build                          # Build all modules\n"
                "  %(prog)s --build --modules attrcalc       # Build specific module\n"
                "  %(prog)s --build -m attrcalc gendata      # Build multiple modules\n"
+               "  %(prog)s --clean                          # Clean all modules\n"
+               "  %(prog)s --clean --modules attrcalc       # Clean specific module\n"
+               "  %(prog)s --clean -m attrcalc gendata      # Clean multiple modules\n"
                "  %(prog)s -l -m attrcalc                   # Short form: list specific module\n"
-               "  %(prog)s -b -m attrcalc gendata           # Short form: build multiple modules",
+               "  %(prog)s -b -m attrcalc gendata           # Short form: build multiple modules\n"
+               "  %(prog)s -c -m attrcalc gendata           # Short form: clean multiple modules",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -495,6 +631,11 @@ def create_argument_parser():
         '--build', '-b',
         action='store_true',
         help='Build and install modules'
+    )
+    action_group.add_argument(
+        '--clean', '-c',
+        action='store_true',
+        help='Clean build artifacts (removes mybuild directories and compile_commands.json files)'
     )
     
     # Module selection
@@ -566,6 +707,25 @@ def print_build_header(target_modules, modules_dir):
         print("🌟 Building all modules")
     print(f"📁 Module directory: {modules_dir}")
     print(f"⚠️  This will run build scripts and install modules")
+    print()
+
+
+def print_clean_header(target_modules, modules_dir):
+    """
+    Print the header information for the clean operation.
+    
+    Args:
+        target_modules: List of target modules or None for all
+        modules_dir: Path to the modules directory
+    """
+    print("🧹 Module Clean System")
+    print("=" * 60)
+    if target_modules:
+        print(f"🎯 Cleaning specific modules: {', '.join(target_modules)}")
+    else:
+        print("🌟 Cleaning all modules")
+    print(f"📁 Module directory: {modules_dir}")
+    print(f"⚠️  This will remove mybuild directories and compile_commands.json files")
     print()
 
 
@@ -695,6 +855,56 @@ def main():
             sys.exit(1)
         else:
             print(f"\n🎉 All modules built successfully!")
+            sys.exit(0)
+    
+    elif args.clean:
+        # Clean build artifacts
+        print_clean_header(target_modules, modules_dir)
+        
+        # Skip confirmation if --no-confirm flag is set
+        if not args.no_confirm:
+            # Confirm with user before proceeding with clean
+            if target_modules:
+                confirmation_msg = f"Are you sure you want to clean {len(target_modules)} module(s): {', '.join(target_modules)}?"
+            else:
+                # Get count of all modules
+                all_modules = get_module_versions(modules_dir, None)
+                module_count = len(all_modules)
+                confirmation_msg = f"Are you sure you want to clean ALL {module_count} modules?"
+            
+            print(f"⚠️  {confirmation_msg}")
+            print("This will:")
+            print("  1. Remove 'mybuild' directories from each module")
+            print("  2. Remove 'compile_commands.json' files from each module")
+            print("  3. This will permanently delete build artifacts")
+            print()
+            
+            try:
+                response = input("Continue? [y/N]: ").strip().lower()
+            except KeyboardInterrupt:
+                print("\n\n🚫 Clean cancelled by user.")
+                return
+            
+            if response not in ['y', 'yes']:
+                print("🚫 Clean cancelled by user.")
+                return
+        else:
+            print("🚀 Proceeding without confirmation (--no-confirm flag set)")
+        
+        # Proceed with clean
+        clean_results = clean_modules(modules_dir, target_modules)
+        
+        if not clean_results:
+            handle_no_modules_found(target_modules, modules_dir)
+            return
+        
+        # Exit with appropriate code
+        failed_count = sum(1 for success in clean_results.values() if not success)
+        if failed_count > 0:
+            print(f"\n💥 {failed_count} module(s) failed to clean. Exiting with error code.")
+            sys.exit(1)
+        else:
+            print(f"\n🎉 All modules cleaned successfully!")
             sys.exit(0)
 
 
