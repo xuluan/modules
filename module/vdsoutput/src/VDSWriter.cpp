@@ -24,8 +24,7 @@ void VDSWriter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
     m_inlineMin = min_val;
     m_inlineMax = max_val;
     m_inlineCount = num_vals;
-    m_inlineStep = static_cast<int>((m_inlineMax - m_inlineMin) / (m_inlineCount - 1));
-
+    m_inlineStep = (m_inlineCount > 1) ? static_cast<int>((m_inlineMax - m_inlineMin) / (m_inlineCount - 1)) : 0;
 }
 
 void VDSWriter::SetSecondaryKeyAxis(int min_val, int max_val, int num_vals)
@@ -33,8 +32,7 @@ void VDSWriter::SetSecondaryKeyAxis(int min_val, int max_val, int num_vals)
     m_crosslineMin = min_val;
     m_crosslineMax = max_val;
     m_crosslineCount = num_vals;
-    m_crosslineStep = static_cast<int>((m_crosslineMax - m_crosslineMin) / (m_crosslineCount - 1));
-
+    m_crosslineStep = (m_crosslineCount > 1) ? static_cast<int>((m_crosslineMax - m_crosslineMin) / (m_crosslineCount - 1)) : 0;
 }
 
 void VDSWriter::SetDataAxis(float min_val, float max_val, int num_vals)
@@ -42,8 +40,7 @@ void VDSWriter::SetDataAxis(float min_val, float max_val, int num_vals)
     m_timeMin = min_val;
     m_timeMax = max_val;
     m_sampleCount = num_vals;
-    m_sampleInterval = (m_timeMax - m_timeMin) / static_cast<float>(m_sampleCount - 1);
-
+    m_sampleInterval = (m_sampleCount > 1) ? (m_timeMax - m_timeMin) / static_cast<float>(m_sampleCount - 1) : 0.0f;
 }
 
 bool VDSWriter::createVdsStore() {
