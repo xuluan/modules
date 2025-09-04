@@ -1,4 +1,4 @@
-#include "Converter.h"
+#include "VDSWriter.h"
 #include <getopt.h>
 #include <cstdlib>
 #include <algorithm>
@@ -6,7 +6,7 @@
 
 // === Public interface methods ===
 
-void Converter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
+void VDSWriter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
 {
     m_inlineMin = min_val;
     m_inlineMax = max_val;
@@ -15,7 +15,7 @@ void Converter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
 
 }
 
-void Converter::SetSecondaryKeyAxis(int min_val, int max_val, int num_vals)
+void VDSWriter::SetSecondaryKeyAxis(int min_val, int max_val, int num_vals)
 {
     m_crosslineMin = min_val;
     m_crosslineMax = max_val;
@@ -24,7 +24,7 @@ void Converter::SetSecondaryKeyAxis(int min_val, int max_val, int num_vals)
 
 }
 
-void Converter::SetDataAxis(float min_val, float max_val, int num_vals)
+void VDSWriter::SetDataAxis(float min_val, float max_val, int num_vals)
 {
     m_timeMin = min_val;
     m_timeMax = max_val;
@@ -33,7 +33,7 @@ void Converter::SetDataAxis(float min_val, float max_val, int num_vals)
 
 }
 
-bool Converter::createVdsStore() {
+bool VDSWriter::createVdsStore() {
     m_logger->LogInfo(m_log_data, "Creating VDS using sliding window method...");
     
     try {
@@ -92,7 +92,7 @@ bool Converter::createVdsStore() {
     return true;
 }
 
-bool Converter::finalize() {
+bool VDSWriter::finalize() {
     m_logger->LogInfo(m_log_data, "Finalizing VDS file...");
     
     // Reset all ChannelChunkWriter instances
@@ -120,7 +120,7 @@ bool Converter::finalize() {
 
 // === Initialization methods ===
 
-bool Converter::setupSlidingWindows() {
+bool VDSWriter::setupSlidingWindows() {
     m_logger->LogInfo(m_log_data, "Setting up sliding windows...");
     
     try {
@@ -150,7 +150,7 @@ bool Converter::setupSlidingWindows() {
     return true;
 }
 
-bool Converter::initializeChunkWriters() {
+bool VDSWriter::initializeChunkWriters() {
     m_logger->LogInfo(m_log_data, "Initializing VDS chunk writers...");
     
     try {
@@ -195,7 +195,7 @@ bool Converter::initializeChunkWriters() {
 
 // === Data loading methods ===
 
-bool Converter::fillSlidingWindows(const std::string& attrName, char *data)
+bool VDSWriter::fill(const std::string& attrName, char *data)
 {
     if(attrName == "Amplitude") {
         return m_amplitudeWindow->fill(data);
@@ -204,13 +204,13 @@ bool Converter::fillSlidingWindows(const std::string& attrName, char *data)
         if(it != m_attributeWindows.end()){
             return it->second->fill(data);
         } else {
-            m_logger->LogError(m_log_data, "Error: fillSlidingWindows cannot find channel {}", attrName);
+            m_logger->LogError(m_log_data, "Error: fill SlidingWindows cannot find channel {}", attrName);
             return false;
         }
     }
 }
 
-bool Converter::slidingWindows(const std::string& attrName)
+bool VDSWriter::slide(const std::string& attrName)
 {
     if(attrName == "Amplitude") {
         return m_amplitudeWindow->slide();
@@ -219,7 +219,7 @@ bool Converter::slidingWindows(const std::string& attrName)
         if(it != m_attributeWindows.end()){
             return it->second->slide();
         } else {            
-            m_logger->LogError(m_log_data, "Error: fillSlidingWindows cannot find channel {}", attrName);
+            m_logger->LogError(m_log_data, "Error: slide slidingWindows cannot find channel {}", attrName);
             return false;
         }
     }
@@ -227,7 +227,7 @@ bool Converter::slidingWindows(const std::string& attrName)
 
 // === Batch processing methods ===
 
-bool Converter::processBatch(const std::string& attrName, int batchStartIdx, int batchEndIdx) {
+bool VDSWriter::processBatch(const std::string& attrName, int batchStartIdx, int batchEndIdx) {
     m_logger->LogInfo(m_log_data, "Processing channel {} batch: inlines [{}, {})", attrName, batchStartIdx, batchEndIdx);
     
     int batchInlineCount = batchEndIdx - batchStartIdx;
@@ -251,7 +251,7 @@ bool Converter::processBatch(const std::string& attrName, int batchStartIdx, int
 
 // === Channel-specific batch writing ===
 
-bool Converter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount) {
+bool VDSWriter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount) {
     m_logger->LogInfo(m_log_data, "Writing amplitude batch data: start={}, count={}", batchStartIdx, 
               batchInlineCount);
 
@@ -294,7 +294,7 @@ bool Converter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount)
 }
 
 
-bool Converter::writeBatchAttributeData(const std::string& attrName, int batchStartIdx, int batchInlineCount) {
+bool VDSWriter::writeBatchAttributeData(const std::string& attrName, int batchStartIdx, int batchInlineCount) {
     m_logger->LogInfo(m_log_data, "Writing attribute '{}' batch data: start={}, count={}", attrName, batchStartIdx, 
               batchInlineCount);
     
@@ -358,7 +358,7 @@ bool Converter::writeBatchAttributeData(const std::string& attrName, int batchSt
 
 // === Utility methods ===
 
-void Converter::addAttributeField(const std::string& name, int width, OpenVDS::VolumeDataFormat format) {
+void VDSWriter::addAttributeField(const std::string& name, int width, OpenVDS::VolumeDataFormat format) {
     //m_segyReader->addAttrField(name, byteLocation, width, format);
     
     AttributeFieldInfo attrInfo;

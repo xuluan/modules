@@ -6,11 +6,11 @@
 #include <GdLogger.h>
 #include <VdsStore.h>
 #include <string>
-#include "Converter.h"
+#include "VDSWriter.h"
 
 struct Vdsoutput {
     std::string url;
-    std::unique_ptr<Converter> m_converter;
+    std::unique_ptr<VDSWriter> m_vds_writer;
 
     std::string pkey_name;
     std::string skey_name;

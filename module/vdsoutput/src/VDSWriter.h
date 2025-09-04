@@ -35,10 +35,10 @@ size_t getVDSDataSize(OpenVDS::VolumeDataFormat format) {
 
 
 /**
- * SEGY to VDS converter using sliding window approach
+ * VDS writer using sliding window approach
  * Memory-efficient conversion for large datasets
  */
-class Converter {
+class VDSWriter {
 private:
     std::string m_outputFile;
     std::unique_ptr<VDSHandler> m_vdsHandler;
@@ -76,7 +76,7 @@ private:
     void* m_log_data;
 
 public:
-    Converter(std::string outputFile, int brick_size, int lod_levels, OpenVDS::CompressionMethod compression_method, 
+    VDSWriter(std::string outputFile, int brick_size, int lod_levels, OpenVDS::CompressionMethod compression_method, 
         float compression_tolerance, OpenVDS::VolumeDataFormat data_format)
         : m_outputFile(outputFile),
           m_brickSize(brick_size), m_lodLevels(lod_levels),
@@ -86,7 +86,7 @@ public:
         m_vdsHandler = nullptr;
         // Initialize logger
         m_logger = &gdlog::GdLogger::GetInstance();
-        m_log_data = m_logger->Init("Converter");
+        m_log_data = m_logger->Init("VDSWriter");
     }
     
     // === Public interface methods ===
@@ -111,9 +111,9 @@ public:
     bool loadAmplitudeData(int globalInlineIdx, char* buffer, size_t bufferSize);
     bool loadAttributeData(const std::string& attrName, int globalInlineIdx, char* buffer, size_t bufferSize);
 
-    bool fillSlidingWindows(const std::string& attrName, char *data);
+    bool fill(const std::string& attrName, char *data);
 
-    bool slidingWindows(const std::string& attrName);
+    bool slide(const std::string& attrName);
 
     // Process current batch for all channels
     bool processBatch(const std::string& attrName, int batchStartIdx, int batchEndIdx);

@@ -5,7 +5,7 @@ project(vdsoutput)
 add_library(vdsoutput STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/vdsoutput.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/ChannelChunkWriter.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/Converter.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/VDSWriter.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/VDSHandler.cpp
 )
 

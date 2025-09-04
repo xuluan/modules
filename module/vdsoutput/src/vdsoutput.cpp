@@ -50,9 +50,9 @@ void vdsoutput_init(const char* myid, const char* buf)
     auto _clean_up = [&] ()-> void {
         if (my_data != nullptr) {
             try {
-                my_data->m_converter->finalize();
+                my_data->m_vds_writer->finalize();
             } catch (const std::exception& e) {
-                    gd_logger.LogError(my_logger, "Error: converter finalize failed!");
+                    gd_logger.LogError(my_logger, "Error: VDS writer finalize failed!");
                 }                
             delete my_data;
         }
@@ -148,7 +148,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         float min_val, max_val;
         job_df.GetAttributeInfo(my_data->trace_name.c_str(), trace_format, trace_attr_length, min_val, max_val);
 
-        my_data->m_converter = std::make_unique<Converter>(my_data->url, my_data->brick_size, my_data->lod_levels,
+        my_data->m_vds_writer = std::make_unique<VDSWriter>(my_data->url, my_data->brick_size, my_data->lod_levels,
             my_data->compression_method, my_data->tolerance, convert_dataformat_to_vds(trace_format));
 
 
@@ -182,7 +182,7 @@ void vdsoutput_init(const char* myid, const char* buf)
                     field.format = convert_dataformat_to_vds(format);
                     field.width *= getVDSDataSize(field.format);
                     my_data->attributes.insert(std::make_pair(name, field));
-                    my_data->m_converter->addAttributeField(name, field.width, field.format);
+                    my_data->m_vds_writer->addAttributeField(name, field.width, field.format);
                     gd_logger.LogInfo(my_logger, "Add Channel: {} ", name);
 
                 }
@@ -204,7 +204,7 @@ void vdsoutput_init(const char* myid, const char* buf)
                 field.format = convert_dataformat_to_vds(format);
                 field.width *= getVDSDataSize(field.format);
                 my_data->attributes.insert(std::make_pair(name, field));
-                my_data->m_converter->addAttributeField(name, field.width, field.format);   
+                my_data->m_vds_writer->addAttributeField(name, field.width, field.format);   
                 gd_logger.LogInfo(my_logger, "Add Channel: {} ", name);
 
             }
@@ -212,17 +212,17 @@ void vdsoutput_init(const char* myid, const char* buf)
         }
 
         //create vds
-        if(!my_data->m_converter->createVdsStore()) {
+        if(!my_data->m_vds_writer->createVdsStore()) {
             throw std::runtime_error("Error: createVdsStore failed!");
         }
 
         //Setup sliding windows for all data types
-        if (!my_data->m_converter->setupSlidingWindows()) {
+        if (!my_data->m_vds_writer->setupSlidingWindows()) {
             throw std::runtime_error("Error: setupSlidingWindows failed!");
         }
 
         //Initialize chunk writers
-        if (!my_data->m_converter->initializeChunkWriters()) {
+        if (!my_data->m_vds_writer->initializeChunkWriters()) {
             throw std::runtime_error("Error: initialize ChunkWriters failed!");
         }
 
@@ -251,9 +251,9 @@ void vdsoutput_process(const char* myid)
     auto _clean_up = [&] ()-> void {
         if (my_data != nullptr) {
             try {
-                my_data->m_converter->finalize();
+                my_data->m_vds_writer->finalize();
             } catch (const std::exception& e) {
-                    gd_logger.LogError(my_logger, "Error: converter finalize failed!");
+                    gd_logger.LogError(my_logger, "Error: VDS writer finalize failed!");
                 } 
             delete my_data;
         }
@@ -282,16 +282,16 @@ void vdsoutput_process(const char* myid)
                 continue;
             }
 
-            if(!my_data->m_converter->fillSlidingWindows(attr_name, data)) {
+            if(!my_data->m_vds_writer->fill(attr_name, data)) {
                 throw std::runtime_error("Error: fillSlidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
 
             }
             if(my_data->batch_num == my_data->brick_size*2 || my_data->batch_end == my_data->num_pkey){
-                if(!my_data->m_converter->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
+                if(!my_data->m_vds_writer->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
                     throw std::runtime_error("Error: processBatch channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
                 }
 
-                if(!my_data->m_converter->slidingWindows(attr_name)) {
+                if(!my_data->m_vds_writer->slide(attr_name)) {
                     throw std::runtime_error("Error: slidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
 
                 }
