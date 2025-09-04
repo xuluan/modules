@@ -1,4 +1,4 @@
-# {pass: no, timeout: 300}
+# {pass: no, timeout: 300, log: ["Parse Error", "Context:"]}
 # Test invalid expressions - should fail parsing
 - testgendata:
     version: '1.0.0'

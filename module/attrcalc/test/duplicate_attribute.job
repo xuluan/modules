@@ -1,4 +1,4 @@
-# {pass: no, timeout: 300}
+# {pass: no, timeout: 300, log: ["Attr Name exists: DUPLICATE_TEST"]}
 # Test creating duplicate attribute names - should fail
 - testgendata:
     version: '1.0.0'

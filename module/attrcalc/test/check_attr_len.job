@@ -1,4 +1,4 @@
-# {"pass":"no"}
+# {pass: no, timeout: 300, log: ["Attribute lengths should be the same, but INLINE = 1 vs SAMPLES = 16"]}
 - testgendata:
     version: '1.0.0'
     primarykey:

@@ -1,0 +1,16 @@
+# {pass: yes, timeout: 300, log: ["Output VDS dataset: /s0/andrew/data/test.vds"]}
+- segyinput:
+    version: '1.0.0'
+    url: '/s0/andrew/data/test.segy'
+    run_mode: 'actual-run'
+    primary_name: 'inline'
+    primary_offset: '5'
+    secondary_name: 'crossline'
+    secondary_offset: '21'
+    data_name: 'trace'
+    sinterval_offset: '17'
+    trace_length_offset: '21'
+    data_format_code_offset: '25'
+- vdsoutput:
+    version: '1.0.0'
+    url: '/s0/andrew/data/test.vds'
