@@ -28,11 +28,11 @@ class ModuleInfo:
 
 @dataclass
 class LogMatchResult:
-    """结果包含日志匹配的详细信息"""
-    patterns: List[str]  # 要匹配的模式列表
-    matched_patterns: List[str]  # 成功匹配的模式
-    unmatched_patterns: List[str]  # 未匹配的模式
-    match_details: Dict[str, List[str]]  # 每个模式匹配到的具体日志行
+    """Result containing detailed information about log matching"""
+    patterns: List[str]  # List of patterns to match
+    matched_patterns: List[str]  # Successfully matched patterns
+    unmatched_patterns: List[str]  # Unmatched patterns
+    match_details: Dict[str, List[str]]  # Specific log lines matched by each pattern
     
     def __post_init__(self):
         if self.patterns is None:
@@ -46,19 +46,19 @@ class LogMatchResult:
     
     @property
     def all_matched(self) -> bool:
-        """返回是否所有模式都匹配成功"""
+        """Returns whether all patterns were matched successfully"""
         return len(self.unmatched_patterns) == 0 and len(self.patterns) > 0
     
     @property
     def has_patterns(self) -> bool:
-        """返回是否有需要匹配的模式"""
+        """Returns whether there are patterns to match"""
         return len(self.patterns) > 0
 
 @dataclass
 class JobConfig:
     pass_expected: bool = True
     timeout: int = 300
-    log_patterns: List[str] = None  # 日志匹配模式
+    log_patterns: List[str] = None  # Log matching patterns
     modules: List[ModuleInfo] = None
     
     def __post_init__(self):
@@ -81,14 +81,14 @@ class JobConfig:
             except (json.JSONDecodeError, ValueError, TypeError):
                 return cls()
         
-        # 解析日志匹配模式
+        # Parse log matching patterns
         log_patterns = []
         if 'log' in config_dict:
             log_config = config_dict['log']
             if isinstance(log_config, list):
                 log_patterns = [str(pattern) for pattern in log_config]
             elif isinstance(log_config, str):
-                # 如果是字符串，尝试解析为JSON数组
+                # If it's a string, try to parse as JSON array
                 try:
                     log_patterns = json.loads(log_config)
                     if not isinstance(log_patterns, list):
@@ -96,7 +96,7 @@ class JobConfig:
                 except:
                     log_patterns = [str(log_config)]
         
-        # 处理pass参数的大小写
+        # Handle pass parameter case sensitivity
         pass_value = config_dict.get('pass', 'yes')
         if isinstance(pass_value, str):
             pass_expected = pass_value.lower() in ['yes', 'true']
@@ -149,25 +149,25 @@ class JobConfig:
 
 
 class LogPatternMatcher:
-    """日志模式匹配器，支持字符串匹配和正则表达式匹配"""
+    """Log pattern matcher that supports string matching and regular expression matching"""
     
     def __init__(self):
         pass
     
     def _is_regex_pattern(self, pattern: str) -> bool:
-        """判断模式是否为正则表达式（以^开头）"""
+        """Determines if pattern is a regular expression (starts with ^)"""
         return pattern.startswith('^')
     
     def _match_pattern(self, pattern: str, log_text: str) -> List[str]:
         """
-        匹配单个模式，返回匹配到的日志行
+        Match a single pattern and return matching log lines
         
         Args:
-            pattern: 要匹配的模式
-            log_text: 要搜索的日志文本
+            pattern: Pattern to match
+            log_text: Log text to search
             
         Returns:
-            匹配到的日志行列表
+            List of matched log lines
         """
         matched_lines = []
         
@@ -177,7 +177,7 @@ class LogPatternMatcher:
         lines = log_text.split('\n')
         
         if self._is_regex_pattern(pattern):
-            # 正则表达式匹配
+            # Regular expression matching
             try:
                 regex_pattern = re.compile(pattern)
                 for line in lines:
@@ -185,14 +185,14 @@ class LogPatternMatcher:
                     if line_stripped and regex_pattern.search(line_stripped):
                         matched_lines.append(line_stripped)
             except re.error:
-                # 如果正则表达式无效，回退到字符串匹配
-                pattern_cleaned = pattern[1:]  # 移除开头的^
+                # If regex is invalid, fallback to string matching
+                pattern_cleaned = pattern[1:]  # Remove leading ^
                 for line in lines:
                     line_stripped = line.strip()
                     if line_stripped and pattern_cleaned in line_stripped:
                         matched_lines.append(line_stripped)
         else:
-            # 字符串匹配
+            # String matching
             for line in lines:
                 line_stripped = line.strip()
                 if line_stripped and pattern in line_stripped:
@@ -202,60 +202,60 @@ class LogPatternMatcher:
     
     def _filter_job_setup_content(self, output: str) -> str:
         """
-        过滤掉作业配置文件的回显，但保留程序执行输出
-        策略：只过滤明确是配置文件内容的行
+        Filter out job config file echoes while preserving program execution output
+        Strategy: Only filter lines that are clearly configuration file content
         """
         lines = output.split('\n')
         filtered_lines = []
         
-        # 更保守的策略：只跳过明确的配置文件展示部分
+        # More conservative strategy: only skip clear config file display sections
         skip_line = False
         
         for line in lines:
             stripped = line.strip()
             
-            # 跳过空行和分隔符
+            # Skip empty lines and separators
             if not stripped or stripped.startswith('=') or stripped.startswith('-'):
                 filtered_lines.append(line)
                 continue
                 
-            # 跳过Job file行和Job Setup标题
+            # Skip Job file line and Job Setup title
             if ('Job file:' in line and '/tests/' in line) or 'Job Setup' in line:
                 skip_line = True
                 continue
                 
-            # 检测YAML配置行（以-开头或缩进的键值对）
+            # Detect YAML config lines (starting with - or indented key-value pairs)
             if skip_line:
-                # 如果是YAML格式的行，跳过
+                # If it's a YAML format line, skip it
                 if (stripped.startswith('-') and ':' in stripped) or \
                    (line.startswith(' ') and ':' in stripped) or \
                    stripped.startswith('#'):
                     continue
-                # 遇到分隔符，结束跳过
+                # Encountered separator, stop skipping
                 elif stripped.startswith('-------'):
                     skip_line = False
                     continue
-                # 其他行（如时间戳、构建输出等）保留
+                # Other lines (like timestamps, build output, etc.) are preserved
                 else:
                     skip_line = False
                     filtered_lines.append(line)
             else:
-                # 正常情况下保留所有行
+                # Normally preserve all lines
                 filtered_lines.append(line)
         
         return '\n'.join(filtered_lines)
 
     def match_patterns(self, patterns: List[str], stdout: str, stderr: str) -> LogMatchResult:
         """
-        匹配所有模式
+        Match all patterns
         
         Args:
-            patterns: 要匹配的模式列表
-            stdout: 标准输出内容
-            stderr: 标准错误输出内容
+            patterns: List of patterns to match
+            stdout: Standard output content
+            stderr: Standard error output content
             
         Returns:
-            LogMatchResult包含匹配结果详情
+            LogMatchResult containing detailed match results
         """
         if not patterns:
             return LogMatchResult(
@@ -265,11 +265,11 @@ class LogPatternMatcher:
                 match_details={}
             )
         
-        # 使用改进的过滤器
+        # Use improved filter
         filtered_stdout = self._filter_job_setup_content(stdout)
         filtered_stderr = self._filter_job_setup_content(stderr)
         
-        # 合并过滤后的输出
+        # Combine filtered output
         combined_log = f"{filtered_stdout}\n{filtered_stderr}"
         
         matched_patterns = []
@@ -305,7 +305,7 @@ class TestResult:
     stdout: str = ""
     stderr: str = ""
     error_msg: str = ""
-    log_match_result: LogMatchResult = None  # 日志匹配结果
+    log_match_result: LogMatchResult = None  # Log matching result
     
     def __post_init__(self):
         if self.modules is None:
@@ -320,19 +320,19 @@ class TestResult:
 
     @property
     def success(self) -> bool:
-        # 第一部分：基本的测试执行结果判断
+        # Part 1: Basic test execution result judgment
         execution_success = False
         if self.expected_pass:
             execution_success = self.status == TestStatus.PASS
         else:
             execution_success = self.status == TestStatus.FAIL
         
-        # 第二部分：日志匹配结果判断（如果有要求的话）
-        log_match_success = True  # 默认成功（如果没有日志匹配要求）
+        # Part 2: Log matching result judgment (if required)
+        log_match_success = True  # Default success (if no log matching requirements)
         if self.log_match_result and self.log_match_result.has_patterns:
             log_match_success = self.log_match_result.all_matched
         
-        # 最终成功 = 执行结果正确 AND 日志匹配成功
+        # Final success = execution result correct AND log matching success
         return execution_success and log_match_success
 
     @property
@@ -500,7 +500,7 @@ class SingleTestRunner:
         print()
     
     def _perform_log_matching(self, config: JobConfig, stdout: str, stderr: str) -> LogMatchResult:
-        """执行日志匹配并返回结果"""
+        """Execute log matching and return results"""
         if config.log_patterns:
             return self.log_matcher.match_patterns(config.log_patterns, stdout, stderr)
         else:
@@ -527,7 +527,7 @@ class SingleTestRunner:
         grun_script = f"{self.test_env.geodelity_dir}/bin/grun.sh"
         
         if not Path(env_script).exists():
-            # 环境脚本不存在的错误情况
+            # Error case where environment script doesn't exist
             log_match_result = LogMatchResult(
                 patterns=config.log_patterns.copy() if config.log_patterns else [],
                 matched_patterns=[],
@@ -547,7 +547,7 @@ class SingleTestRunner:
             )
         
         if not Path(grun_script).exists():
-            # GRun脚本不存在的错误情况
+            # Error case where GRun script doesn't exist
             log_match_result = LogMatchResult(
                 patterns=config.log_patterns.copy() if config.log_patterns else [],
                 matched_patterns=[],
@@ -582,7 +582,7 @@ class SingleTestRunner:
             
             status = TestStatus.PASS if result.returncode == 0 else TestStatus.FAIL
             
-            # 执行日志匹配
+            # Execute log matching
             log_match_result = self._perform_log_matching(config, result.stdout, result.stderr)
             
             return TestResult(
@@ -602,7 +602,7 @@ class SingleTestRunner:
             stdout_str = e.stdout.decode('utf-8') if e.stdout else ""
             stderr_str = e.stderr.decode('utf-8') if e.stderr else ""
             
-            # 即使超时也尝试进行日志匹配
+            # Even if timeout, try to perform log matching
             log_match_result = self._perform_log_matching(config, stdout_str, stderr_str)
             
             return TestResult(
@@ -621,7 +621,7 @@ class SingleTestRunner:
         except Exception as e:
             runtime = time.time() - start_time
             
-            # 异常情况下创建空的日志匹配结果
+            # Create empty log matching result in exceptional cases
             log_match_result = LogMatchResult(
                 patterns=config.log_patterns.copy() if config.log_patterns else [],
                 matched_patterns=[],
@@ -733,7 +733,7 @@ class TestOutputFormatter:
         return error_lines
     
     def print_log_match_result(self, result: TestResult) -> None:
-        """打印日志匹配结果"""
+        """Print log matching results"""
         if not result.log_match_result or not result.log_match_result.has_patterns:
             return
         
@@ -744,20 +744,20 @@ class TestOutputFormatter:
         else:
             print(f"  ❌ Log Pattern Match: {len(log_match.matched_patterns)}/{len(log_match.patterns)} pattern(s) matched")
         
-        # 显示匹配的模式
+        # Display matched patterns
         if log_match.matched_patterns:
             print(f"    ✅ Matched patterns:")
             for pattern in log_match.matched_patterns:
                 matched_lines = log_match.match_details.get(pattern, [])
                 print(f"      • '{pattern}' → found {len(matched_lines)} match(es)")
-                # 显示第一个匹配的示例（截断长行）
+                # Display first matched example (truncate long lines)
                 if matched_lines:
                     example = matched_lines[0]
                     if len(example) > 80:
                         example = example[:77] + "..."
                     print(f"        Example: {example}")
         
-        # 显示未匹配的模式
+        # Display unmatched patterns
         if log_match.unmatched_patterns:
             print(f"    ❌ Unmatched patterns:")
             for pattern in log_match.unmatched_patterns:
@@ -851,7 +851,7 @@ class TestOutputFormatter:
                     actual_text = result.status.value
                     reason = f"Expected: {expected_text}, Actual: {actual_text}"
                     
-                    # 添加日志匹配失败信息
+                    # Add log matching failure information
                     if result.log_match_result and result.log_match_result.has_patterns and not result.log_match_result.all_matched:
                         unmatched_count = len(result.log_match_result.unmatched_patterns)
                         total_patterns = len(result.log_match_result.patterns)
