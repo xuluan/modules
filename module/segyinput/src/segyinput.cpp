@@ -206,6 +206,8 @@ void segyinput_init(const char* myid, const char* buf)
                 default:
                     throw std::runtime_error("Error: unsupported SEGY data sample format");
             }
+
+            gd_logger.LogInfo(my_logger, "trace type : {}", std::to_string(static_cast<int>(type)));
             job_df.AddAttribute(my_data->trace_name.c_str(), type, my_data->trace_length);
             
             job_df.SetVolumeDataName(my_data->trace_name.c_str());    

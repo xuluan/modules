@@ -150,7 +150,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         int trace_attr_length;
         float min_val, max_val;
         job_df.GetAttributeInfo(my_data->trace_name.c_str(), trace_format, trace_attr_length, min_val, max_val);
-        trace_format = as::DataFormat::FORMAT_R32;//todo
+        gd_logger.LogInfo(my_logger, "trace type : {}", std::to_string(static_cast<int>(trace_format)));
 
         my_data->m_vds_writer = std::make_unique<VDSWriter>(my_data->url, my_data->brick_size, my_data->lod_levels,
             my_data->compression_method, my_data->tolerance, convert_dataformat_to_vds(trace_format));
