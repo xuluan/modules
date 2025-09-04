@@ -95,7 +95,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         try {
             std::string compression = vdsout_config.at("compression", "vdsoutput").as_string();
             if(compression == "none") {
-
+                my_data->compression_method = OpenVDS::CompressionMethod::None;
             } else if(compression == "zip") {
                 my_data->compression_method = OpenVDS::CompressionMethod::Zip;
             } else if(compression == "wavelet") {
@@ -326,7 +326,6 @@ void vdsoutput_process(const char* myid)
         my_data->is_success = false;
         gd_logger.LogError(my_logger, "Exception in vdsoutput_process: {}", e.what());
         job_df.SetJobAborted();
-        _clean_up();
         return;
     }
 

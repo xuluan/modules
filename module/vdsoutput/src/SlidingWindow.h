@@ -92,7 +92,7 @@ public:
     //fill one inline
     bool fill(char *data) {
         //if space enough
-        if (m_validInlineCount >= m_brickSize*2) {
+        if (m_validInlineCount >= m_windowCapacity) {
             return false;
         }
         int offset = m_inlineSize * m_validInlineCount;
