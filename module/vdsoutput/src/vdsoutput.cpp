@@ -26,7 +26,7 @@ OpenVDS::VolumeDataFormat convert_dataformat_to_vds(as::DataFormat format)
         case as::DataFormat::FORMAT_U64:
             return OpenVDS::VolumeDataFormat::Format_U64;
         default:
-            throw std::runtime_error("Error: no support as::DataFormat:  " + std::to_string(static_cast<int>(format)));  
+            throw std::runtime_error("Unsupport as::DataFormat type:  " + std::to_string(static_cast<int>(format)));  
     }
 }
 
@@ -52,7 +52,7 @@ void vdsoutput_init(const char* myid, const char* buf)
             try {
                 my_data->m_vds_writer->finalize();
             } catch (const std::exception& e) {
-                    gd_logger.LogError(my_logger, "Error: VDS writer finalize failed!");
+                    gd_logger.LogError(my_logger, "VDS writer finalize failed!");
                 }                
             delete my_data;
         }
@@ -65,7 +65,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         //parse url
         my_data->url = config.at("url", "vdsoutput").as_string();
         if (my_data->url.empty()) {
-            throw std::runtime_error("Error: vdsoutput url is empty");
+            throw std::runtime_error("VDS output URL is empty");
         }
         gd_logger.LogInfo(my_logger, "vdsoutput url: {}", my_data->url);
 
@@ -73,7 +73,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         std::filesystem::path output_path(my_data->url);
         std::filesystem::path parent_dir = output_path.parent_path();
         if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
-            throw std::runtime_error("Error: vdsoutput parent directory does not exist: " + parent_dir.string());
+            throw std::runtime_error("VDS output parent directory does not exist:" + parent_dir.string());
         }   
         
         //parse config
@@ -213,17 +213,17 @@ void vdsoutput_init(const char* myid, const char* buf)
 
         //create vds
         if(!my_data->m_vds_writer->createVdsStore()) {
-            throw std::runtime_error("Error: createVdsStore failed!");
+            throw std::runtime_error("Failed to create VDS store");
         }
 
         //Setup sliding windows for all data types
         if (!my_data->m_vds_writer->setupSlidingWindows()) {
-            throw std::runtime_error("Error: setupSlidingWindows failed!");
+            throw std::runtime_error("Failed to setup sliding windows");
         }
 
         //Initialize chunk writers
         if (!my_data->m_vds_writer->initializeChunkWriters()) {
-            throw std::runtime_error("Error: initialize ChunkWriters failed!");
+            throw std::runtime_error("Failed to initialize chunk writers");
         }
 
 
@@ -283,16 +283,16 @@ void vdsoutput_process(const char* myid)
             }
 
             if(!my_data->m_vds_writer->fill(attr_name, data)) {
-                throw std::runtime_error("Error: fillSlidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
+                throw std::runtime_error("Failed to fill sliding window for channel: "+ attr_name + " at primary index : " + std::to_string(my_data->current_pkey_index));
 
             }
             if(my_data->batch_num == my_data->brick_size*2 || my_data->batch_end == my_data->num_pkey){
                 if(!my_data->m_vds_writer->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
-                    throw std::runtime_error("Error: processBatch channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
+                    throw std::runtime_error("Failed to process batch for channel: "+ attr_name + " at primary index : " + std::to_string(my_data->current_pkey_index));
                 }
 
                 if(!my_data->m_vds_writer->slide(attr_name)) {
-                    throw std::runtime_error("Error: slidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
+                    throw std::runtime_error("Failed to slide window for channel: "+ attr_name + " at primary index : " + std::to_string(my_data->current_pkey_index));
 
                 }
             }

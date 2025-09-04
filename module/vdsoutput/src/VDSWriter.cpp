@@ -160,7 +160,7 @@ bool VDSWriter::initializeChunkWriters() {
                                               m_inlineCount, m_crosslineCount, m_sampleCount,
                                               m_inlineMin, m_inlineStep,
                                               m_crosslineMin, m_crosslineStep)) {
-            m_logger->LogError(m_log_data, "Error: Failed to initialize amplitude chunk writer: {}", 
+            m_logger->LogError(m_log_data, "Failed to initialize amplitude chunk writer: {}", 
                       m_amplitudeChunkWriter->GetLastError());
             return false;
         }
@@ -176,7 +176,7 @@ bool VDSWriter::initializeChunkWriters() {
                                            m_inlineCount, m_crosslineCount, sampleCount,
                                            m_inlineMin, m_inlineStep,
                                            m_crosslineMin, m_crosslineStep)) {
-                m_logger->LogError(m_log_data, "Error: Failed to initialize attribute chunk writer '{}': {}", attr.name, 
+                m_logger->LogError(m_log_data, "Failed to initialize attribute chunk writer '{}': {}", attr.name, 
                           attrChunkWriter->GetLastError());
                 return false;
             }
@@ -204,7 +204,7 @@ bool VDSWriter::fill(const std::string& attrName, char *data)
         if(it != m_attributeWindows.end()){
             return it->second->fill(data);
         } else {
-            m_logger->LogError(m_log_data, "Error: fill SlidingWindows cannot find channel {}", attrName);
+            m_logger->LogError(m_log_data, "Channel: {} not found for fill operation", attrName);
             return false;
         }
     }
@@ -219,7 +219,7 @@ bool VDSWriter::slide(const std::string& attrName)
         if(it != m_attributeWindows.end()){
             return it->second->slide();
         } else {            
-            m_logger->LogError(m_log_data, "Error: slide slidingWindows cannot find channel {}", attrName);
+            m_logger->LogError(m_log_data, "Channel: {} not found for slide operation", attrName);
             return false;
         }
     }
@@ -240,7 +240,7 @@ bool VDSWriter::processBatch(const std::string& attrName, int batchStartIdx, int
         if(it != m_attributeWindows.end()){
             return writeBatchAttributeData(attrName, batchStartIdx, batchInlineCount);
         } else {               
-            m_logger->LogError(m_log_data, "Error: processBatch cannot find channel {}", attrName);
+            m_logger->LogError(m_log_data, "Channel: {} not found for batch processing", attrName);
             return false;
         }      
     }
@@ -280,7 +280,7 @@ bool VDSWriter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount)
 
         if (!m_amplitudeChunkWriter->WriteBatchData(batchDataPtr, batchDataSize, 
                                                   batchStartIdx, batchInlineCount, elementSize)) {
-            m_logger->LogError(m_log_data, "Error: Failed to write amplitude batch data: {}", 
+            m_logger->LogError(m_log_data, "Failed to write amplitude batch data: {}", 
                       m_amplitudeChunkWriter->GetLastError());
             return false;
         }
@@ -319,7 +319,7 @@ bool VDSWriter::writeBatchAttributeData(const std::string& attrName, int batchSt
     // Check if window contains required data
     if (!attrWindow->containsInline(batchStartIdx) || 
         !attrWindow->containsInline(batchStartIdx + batchInlineCount - 1)) {
-        m_logger->LogError(m_log_data, "Error: Sliding window does not contain required data for attribute batch {}", 
+        m_logger->LogError(m_log_data, "Sliding window missing required data for attribute batch: {}", 
                   attrName);
         return false;
     }
@@ -343,7 +343,7 @@ bool VDSWriter::writeBatchAttributeData(const std::string& attrName, int batchSt
         size_t elementSize = attrIter->width;
         if (!chunkWriterIter->second->WriteBatchData(batchDataPtr, batchDataSize,
                                                    batchStartIdx, batchInlineCount, elementSize)) {
-            m_logger->LogError(m_log_data, "Error: Failed to write attribute batch data for {}: {}", attrName,
+            m_logger->LogError(m_log_data, "Failed to write attribute batch data for {}: {}", attrName,
                       chunkWriterIter->second->GetLastError());
             return false;
         }
@@ -351,7 +351,7 @@ bool VDSWriter::writeBatchAttributeData(const std::string& attrName, int batchSt
         return true;
         
     } catch (const std::exception& e) {
-        m_logger->LogError(m_log_data, "Error: Exception writing attribute batch {}: {}", attrName, e.what());
+        m_logger->LogError(m_log_data, "Exception writing attribute batch {}: {}", attrName, e.what());
         return false;
     }
 }
