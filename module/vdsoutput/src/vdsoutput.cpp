@@ -61,9 +61,10 @@ void vdsoutput_init(const char* myid, const char* buf)
     try {
         // parse job parameters
         gutl::DynamicValue config = gutl::parse(buf);
+        auto& vdsout_config = config["vdsoutput"];
 
         //parse url
-        my_data->url = config.at("url", "vdsoutput").as_string();
+        my_data->url = vdsout_config.at("url", "vdsoutput").as_string();
         if (my_data->url.empty()) {
             throw std::runtime_error("VDS output URL is empty");
         }
@@ -78,19 +79,19 @@ void vdsoutput_init(const char* myid, const char* buf)
         
         //parse config
         try {
-            my_data->brick_size = config.at("brick_size", "vdsoutput").as_int();
+            my_data->brick_size = vdsout_config.at("brick_size", "vdsoutput").as_int();
         } catch (const std::exception& e) {
             my_data->brick_size = 64;
         }
 
         try {
-            my_data->lod_levels = config.at("lod_levels", "vdsoutput").as_int();
+            my_data->lod_levels = vdsout_config.at("lod_levels", "vdsoutput").as_int();
         } catch (const std::exception& e) {
             my_data->lod_levels = 0;
         }
 
         try {
-            std::string compression = config.at("compression", "vdsoutput").as_string();
+            std::string compression = vdsout_config.at("compression", "vdsoutput").as_string();
             if(compression == "none") {
 
             } else if(compression == "zip") {
@@ -105,7 +106,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         }
 
         try {
-            my_data->tolerance = config.at("tolerance", "vdsoutput").as_float();
+            my_data->tolerance = vdsout_config.at("tolerance", "vdsoutput").as_float();
         } catch (const std::exception& e) {
             my_data->tolerance = 0.01;
         }
@@ -113,7 +114,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         // Get data flow information to configure VDS writer
         my_data->pkey_name = job_df.GetPrimaryKeyName();
         my_data->skey_name = job_df.GetSecondaryKeyName();
-        my_data->trace_name = "Amplitude"; //using vds channle name instead of job_df.GetVolumeDataName();
+        my_data->trace_name = job_df.GetVolumeDataName();
         
         gd_logger.LogInfo(my_logger, "Primary key: {}, Secondary key: {}, Trace data: {}", 
                             my_data->pkey_name, my_data->skey_name, my_data->trace_name);
@@ -147,10 +148,15 @@ void vdsoutput_init(const char* myid, const char* buf)
         int trace_attr_length;
         float min_val, max_val;
         job_df.GetAttributeInfo(my_data->trace_name.c_str(), trace_format, trace_attr_length, min_val, max_val);
+        trace_format = as::DataFormat::FORMAT_R32;//todo
 
         my_data->m_vds_writer = std::make_unique<VDSWriter>(my_data->url, my_data->brick_size, my_data->lod_levels,
             my_data->compression_method, my_data->tolerance, convert_dataformat_to_vds(trace_format));
 
+
+        my_data->m_vds_writer->SetPrimaryKeyAxis(my_data->fpkey, my_data->lpkey, my_data->num_pkey);
+        my_data->m_vds_writer->SetSecondaryKeyAxis(my_data->fskey, my_data->lskey, my_data->num_skey);
+        my_data->m_vds_writer->SetDataAxis(my_data->tmin, my_data->tmax, my_data->trace_length);
 
         auto& attrs = config["vdsoutput"]["attributes"];
         if(attrs.is_array()) {
@@ -282,6 +288,11 @@ void vdsoutput_process(const char* myid)
                 continue;
             }
 
+            if(attr_name == my_data->trace_name ){
+                attr_name = "Amplitude";
+
+            }
+
             if(!my_data->m_vds_writer->fill(attr_name, data)) {
                 throw std::runtime_error("Failed to fill sliding window for channel: "+ attr_name + " at primary index : " + std::to_string(my_data->current_pkey_index));
 
@@ -290,6 +301,8 @@ void vdsoutput_process(const char* myid)
                 if(!my_data->m_vds_writer->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
                     throw std::runtime_error("Failed to process batch for channel: "+ attr_name + " at primary index : " + std::to_string(my_data->current_pkey_index));
                 }
+            }
+            if(my_data->batch_num == my_data->brick_size*2){
 
                 if(!my_data->m_vds_writer->slide(attr_name)) {
                     throw std::runtime_error("Failed to slide window for channel: "+ attr_name + " at primary index : " + std::to_string(my_data->current_pkey_index));

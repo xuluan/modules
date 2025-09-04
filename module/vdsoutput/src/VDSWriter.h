@@ -21,17 +21,7 @@ struct AttributeFieldInfo {
     ValueRange valueRange;
 };
 
-size_t getVDSDataSize(OpenVDS::VolumeDataFormat format) {
-    switch(format) {
-        case OpenVDS::VolumeDataFormat::Format_U8:      return 1;
-        case OpenVDS::VolumeDataFormat::Format_U16:     return 2;
-        case OpenVDS::VolumeDataFormat::Format_U32:     return 4;
-        case OpenVDS::VolumeDataFormat::Format_R32:     return 4;
-        case OpenVDS::VolumeDataFormat::Format_R64:     return 8;
-        case OpenVDS::VolumeDataFormat::Format_U64:     return 8;
-        default: return 4; // Default to float
-    }
-}
+size_t getVDSDataSize(OpenVDS::VolumeDataFormat format);
 
 
 /**

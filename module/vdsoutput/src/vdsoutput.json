@@ -22,7 +22,7 @@
 },
 "compression": {
   "type": "choice",
-  "required": true,
+  "required": false,
   "help": "Set VDS compression method (none, wavelet and zip, default: none)",
   "format": "text",
   "default": "none",
