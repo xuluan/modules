@@ -46,16 +46,6 @@ private:
 
     std::vector<AttributeFieldInfo> m_attributeFields;
     
-    // SEGY Trace Header control
-    static const size_t TRACE_HEADER_SIZE = 240;
-    
-    // SEGY parameters
-    int m_primaryOffset = 5;
-    int m_secondaryOffset = 21;
-    int m_sampleIntervalOffset = 17;
-    int m_traceLengthOffset = 21;
-    int m_dataFormatCodeOffset = 25;
-    
     // Conversion parameters
     int m_brickSize = 64;                // Must match VDS brick size
     int m_lodLevels = 0;

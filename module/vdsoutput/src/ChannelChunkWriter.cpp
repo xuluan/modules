@@ -194,7 +194,7 @@ bool ChannelChunkWriter::ProcessChunk(
     int chunkInlineEnd = chunkMax[2];
     int batchInlineEnd = batchStartInlineIdx + batchInlineCount;
     
-    // NOT chunk in batch，skip
+    // Chunk should be in batch or skip
     if (!(chunkInlineStart >= batchStartInlineIdx && chunkInlineEnd <= batchInlineEnd)) {
         return true;  // skip
     }
@@ -217,13 +217,12 @@ bool ChannelChunkWriter::ProcessChunk(
         m_lastError = "Failed to get writable buffer for chunk " + std::to_string(chunkIndex);
         return false;
     }
-#if DEBUG_DUMP
     m_logger->LogDebug(m_log_data, "ProcessChunk: {}", chunkIndex);
     m_logger->LogDebug(m_log_data, "Chunk boundaries: [{}, {}, {}] - [{}, {}, {}]",
                        chunkMin[0], chunkMin[1], chunkMin[2],
                        chunkMax[0], chunkMax[1], chunkMax[2]);
     m_logger->LogDebug(m_log_data, "Pitch: [{}, {}, {}]", pitch[0], pitch[1], pitch[2]);
-#endif    
+
     // Get source data pointer
     const char* sourceBytes = static_cast<const char*>(batchData);
     char* chunkBytes = static_cast<char*>(chunkBuffer);

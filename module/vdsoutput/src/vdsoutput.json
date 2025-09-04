@@ -54,5 +54,5 @@
   "type": "The attribute name that needs to be saved to the channel in VDS file; if not set, all current attributes will be saved.",
   "help": "Name of the attribute",
   "format": "text",
-  "width": "default",
+  "width": "default"
 }

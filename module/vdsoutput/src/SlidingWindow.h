@@ -84,7 +84,7 @@ public:
         
         // Update window state
         m_windowStartIdx += m_brickSize;
-        m_validInlineCount = m_brickSize;
+        m_validInlineCount -= m_brickSize;
         
         return true;
     }
@@ -97,9 +97,11 @@ public:
         }
         int offset = m_inlineSize * m_validInlineCount;
         std::memcpy(m_buffer.data() + offset, data, m_inlineSize);
+        m_validInlineCount++;
+        m_windowEndIdx++;
         return true;
     }
-    
+
     // Zero-copy version: get direct pointer to range data
     const char* getRangePointer(int startGlobalIdx, int count, size_t& dataSize) const {
         if (!containsInline(startGlobalIdx) || 

@@ -49,7 +49,11 @@ void vdsoutput_init(const char* myid, const char* buf)
     // A handy function to clean up resources if errors happen
     auto _clean_up = [&] ()-> void {
         if (my_data != nullptr) {
-            my_data->m_converter->finalize();
+            try {
+                my_data->m_converter->finalize();
+            } catch (const std::exception& e) {
+                    gd_logger.LogError(my_logger, "Error: converter finalize failed!");
+                }                
             delete my_data;
         }
     };
@@ -196,7 +200,7 @@ void vdsoutput_init(const char* myid, const char* buf)
                 AttributeFieldInfo field;
                 as::DataFormat format;
                 field.name = name;
-                job_df.GetAttributeInfo(my_data->trace_name.c_str(), format, field.width, min_val, max_val);
+                job_df.GetAttributeInfo(name.c_str(), format, field.width, min_val, max_val);
                 field.format = convert_dataformat_to_vds(format);
                 field.width *= getVDSDataSize(field.format);
                 my_data->attributes.insert(std::make_pair(name, field));
@@ -246,12 +250,16 @@ void vdsoutput_process(const char* myid)
     // or job has finished
     auto _clean_up = [&] ()-> void {
         if (my_data != nullptr) {
+            try {
+                my_data->m_converter->finalize();
+            } catch (const std::exception& e) {
+                    gd_logger.LogError(my_logger, "Error: converter finalize failed!");
+                } 
             delete my_data;
         }
     };
 
     if (job_df.JobFinished()) {
-        my_data->m_converter->finalize();
         _clean_up();
         return;
     }
@@ -274,16 +282,16 @@ void vdsoutput_process(const char* myid)
                 continue;
             }
 
-            if(my_data->m_converter->fillSlidingWindows(attr_name, data)) {
+            if(!my_data->m_converter->fillSlidingWindows(attr_name, data)) {
                 throw std::runtime_error("Error: fillSlidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
 
             }
             if(my_data->batch_num == my_data->brick_size*2 || my_data->batch_end == my_data->num_pkey){
-                if(my_data->m_converter->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
+                if(!my_data->m_converter->processBatch(attr_name, my_data->batch_start, my_data->batch_end)) {
                     throw std::runtime_error("Error: processBatch channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
                 }
 
-                if(my_data->m_converter->slidingWindows(attr_name)) {
+                if(!my_data->m_converter->slidingWindows(attr_name)) {
                     throw std::runtime_error("Error: slidingWindows channel: "+ attr_name + " primary index : " + std::to_string(my_data->current_pkey_index));
 
                 }

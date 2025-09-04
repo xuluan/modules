@@ -11,7 +11,7 @@ void Converter::SetPrimaryKeyAxis(int min_val, int max_val, int num_vals)
     m_inlineMin = min_val;
     m_inlineMax = max_val;
     m_inlineCount = num_vals;
-    m_inlineStep = (m_inlineMax - m_inlineMin) / static_cast<float>(m_inlineCount - 1);
+    m_inlineStep = static_cast<int>((m_inlineMax - m_inlineMin) / (m_inlineCount - 1));
 
 }
 
@@ -20,7 +20,7 @@ void Converter::SetSecondaryKeyAxis(int min_val, int max_val, int num_vals)
     m_crosslineMin = min_val;
     m_crosslineMax = max_val;
     m_crosslineCount = num_vals;
-    m_crosslineStep = (m_crosslineMax - m_crosslineMin) / static_cast<float>(m_crosslineCount - 1);
+    m_crosslineStep = static_cast<int>((m_crosslineMax - m_crosslineMin) / (m_crosslineCount - 1));
 
 }
 
@@ -160,7 +160,7 @@ bool Converter::initializeChunkWriters() {
                                               m_inlineCount, m_crosslineCount, m_sampleCount,
                                               m_inlineMin, m_inlineStep,
                                               m_crosslineMin, m_crosslineStep)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to initialize amplitude chunk writer: {}", 
+            m_logger->LogError(m_log_data, "Error: Failed to initialize amplitude chunk writer: {}", 
                       m_amplitudeChunkWriter->GetLastError());
             return false;
         }
@@ -176,7 +176,7 @@ bool Converter::initializeChunkWriters() {
                                            m_inlineCount, m_crosslineCount, sampleCount,
                                            m_inlineMin, m_inlineStep,
                                            m_crosslineMin, m_crosslineStep)) {
-                m_logger->LogError(m_log_data, "ERROR: Failed to initialize attribute chunk writer '{}': {}", attr.name, 
+                m_logger->LogError(m_log_data, "Error: Failed to initialize attribute chunk writer '{}': {}", attr.name, 
                           attrChunkWriter->GetLastError());
                 return false;
             }
@@ -200,8 +200,9 @@ bool Converter::fillSlidingWindows(const std::string& attrName, char *data)
     if(attrName == "Amplitude") {
         return m_amplitudeWindow->fill(data);
     } else {
-        if(m_attributeWindows.find(attrName) != m_attributeWindows.end()){
-            return m_attributeWindows[attrName]->fill(data);
+        auto it = m_attributeWindows.find(attrName);
+        if(it != m_attributeWindows.end()){
+            return it->second->fill(data);
         } else {
             m_logger->LogError(m_log_data, "Error: fillSlidingWindows cannot find channel {}", attrName);
             return false;
@@ -214,9 +215,10 @@ bool Converter::slidingWindows(const std::string& attrName)
     if(attrName == "Amplitude") {
         return m_amplitudeWindow->slide();
     } else {
-        if(m_attributeWindows.find(attrName) != m_attributeWindows.end()){
-            return m_attributeWindows[attrName]->slide();
-        } else {
+        auto it = m_attributeWindows.find(attrName);
+        if(it != m_attributeWindows.end()){
+            return it->second->slide();
+        } else {            
             m_logger->LogError(m_log_data, "Error: fillSlidingWindows cannot find channel {}", attrName);
             return false;
         }
@@ -234,11 +236,10 @@ bool Converter::processBatch(const std::string& attrName, int batchStartIdx, int
         // Write amplitude data for entire batch
         return writeBatchAmplitudeData(batchStartIdx, batchInlineCount);
     } else {
-
-        if(m_attributeWindows.find(attrName) != m_attributeWindows.end()){
-            // Write attribute data for entire batch
+        auto it = m_attributeWindows.find(attrName);
+        if(it != m_attributeWindows.end()){
             return writeBatchAttributeData(attrName, batchStartIdx, batchInlineCount);
-        } else {
+        } else {               
             m_logger->LogError(m_log_data, "Error: processBatch cannot find channel {}", attrName);
             return false;
         }      
@@ -279,7 +280,7 @@ bool Converter::writeBatchAmplitudeData(int batchStartIdx, int batchInlineCount)
 
         if (!m_amplitudeChunkWriter->WriteBatchData(batchDataPtr, batchDataSize, 
                                                   batchStartIdx, batchInlineCount, elementSize)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to write amplitude batch data: {}", 
+            m_logger->LogError(m_log_data, "Error: Failed to write amplitude batch data: {}", 
                       m_amplitudeChunkWriter->GetLastError());
             return false;
         }
@@ -318,7 +319,7 @@ bool Converter::writeBatchAttributeData(const std::string& attrName, int batchSt
     // Check if window contains required data
     if (!attrWindow->containsInline(batchStartIdx) || 
         !attrWindow->containsInline(batchStartIdx + batchInlineCount - 1)) {
-        m_logger->LogError(m_log_data, "ERROR: Sliding window does not contain required data for attribute batch {}", 
+        m_logger->LogError(m_log_data, "Error: Sliding window does not contain required data for attribute batch {}", 
                   attrName);
         return false;
     }
@@ -342,7 +343,7 @@ bool Converter::writeBatchAttributeData(const std::string& attrName, int batchSt
         size_t elementSize = attrIter->width;
         if (!chunkWriterIter->second->WriteBatchData(batchDataPtr, batchDataSize,
                                                    batchStartIdx, batchInlineCount, elementSize)) {
-            m_logger->LogError(m_log_data, "ERROR: Failed to write attribute batch data for {}: {}", attrName,
+            m_logger->LogError(m_log_data, "Error: Failed to write attribute batch data for {}: {}", attrName,
                       chunkWriterIter->second->GetLastError());
             return false;
         }
@@ -350,7 +351,7 @@ bool Converter::writeBatchAttributeData(const std::string& attrName, int batchSt
         return true;
         
     } catch (const std::exception& e) {
-        m_logger->LogError(m_log_data, "ERROR: Exception writing attribute batch {}: {}", attrName, e.what());
+        m_logger->LogError(m_log_data, "Error: Exception writing attribute batch {}: {}", attrName, e.what());
         return false;
     }
 }
