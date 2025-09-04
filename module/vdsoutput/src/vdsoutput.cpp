@@ -63,6 +63,8 @@ void vdsoutput_init(const char* myid, const char* buf)
         gutl::DynamicValue config = gutl::parse(buf);
         auto& vdsout_config = config["vdsoutput"];
 
+        my_data->is_success = true;
+
         //parse url
         my_data->url = vdsout_config.at("url", "vdsoutput").as_string();
         if (my_data->url.empty()) {
@@ -237,6 +239,7 @@ void vdsoutput_init(const char* myid, const char* buf)
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
 
     } catch (const std::exception& e) {
+        my_data->is_success = false;
         gd_logger.LogError(my_logger, e.what());
         job_df.SetJobAborted();
         _clean_up();
@@ -256,16 +259,23 @@ void vdsoutput_process(const char* myid)
     // or job has finished
     auto _clean_up = [&] ()-> void {
         if (my_data != nullptr) {
-            try {
-                my_data->m_vds_writer->finalize();
-            } catch (const std::exception& e) {
-                    gd_logger.LogError(my_logger, "Error: VDS writer finalize failed!");
-                } 
             delete my_data;
         }
     };
 
     if (job_df.JobFinished()) {
+        try {
+            my_data->is_success = my_data->m_vds_writer->finalize() && my_data->is_success;
+        } catch (const std::exception& e) {
+                gd_logger.LogError(my_logger, "Error: VDS writer finalize failed!");
+                my_data->is_success = false;
+        } 
+
+        if (my_data->is_success == false) {
+            gd_logger.LogError(my_logger, "VDS output failed!");
+        } else {
+            gd_logger.LogInfo(my_logger, "Output VDS dataset: {}", my_data->url);
+        }
         _clean_up();
         return;
     }
@@ -313,6 +323,7 @@ void vdsoutput_process(const char* myid)
 
         //file.close();      
     } catch (const std::exception& e) {
+        my_data->is_success = false;
         gd_logger.LogError(my_logger, "Exception in vdsoutput_process: {}", e.what());
         job_df.SetJobAborted();
         _clean_up();

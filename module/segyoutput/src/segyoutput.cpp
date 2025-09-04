@@ -44,6 +44,8 @@ void segyoutput_init(const char* myid, const char* buf)
         // parse job parameters
         gutl::DynamicValue config = gutl::parse(buf);
 
+        my_data->is_success = true;
+
         auto& segyout_config = config["segyoutput"];
 
         //parse url
@@ -272,6 +274,7 @@ void segyoutput_init(const char* myid, const char* buf)
         job_df.SetModuleStruct(myid, static_cast<void*>(my_data));
 
     } catch (const std::exception& e) {
+        my_data->is_success = false;
         gd_logger.LogError(my_logger, e.what());
         job_df.SetJobAborted();
         _clean_up();
@@ -298,6 +301,12 @@ void segyoutput_process(const char* myid)
     if (job_df.JobFinished()) {
 
         my_data->segy_writer.finished();
+
+        if(my_data->is_success) {
+            gd_logger.LogInfo(my_logger, "Output SEGY dataset: {}", my_data->url);
+        } else {
+            gd_logger.LogError(my_logger, "SEGY output failed!");
+        }
 
         _clean_up();
         return;
@@ -343,6 +352,7 @@ void segyoutput_process(const char* myid)
         }
         //file.close();      
     } catch (const std::exception& e) {
+        my_data->is_success = false;
         gd_logger.LogError(my_logger, "Exception in segyoutput_process: {}", e.what());
         job_df.SetJobAborted();
         _clean_up();

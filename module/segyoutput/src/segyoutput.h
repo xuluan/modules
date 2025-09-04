@@ -36,6 +36,7 @@ struct Segyoutput {
     int num_skey;
     int num_pkey;
     int current_pkey;
+    bool is_success;
     
     void* logger;
 };

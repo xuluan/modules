@@ -46,6 +46,8 @@ struct Vdsoutput {
     float tolerance;
     int lod_levels;
     int brick_size;
+
+    bool is_success;
     
     void* logger;
 };
