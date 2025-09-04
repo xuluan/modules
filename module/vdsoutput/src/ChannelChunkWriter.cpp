@@ -25,12 +25,7 @@ ChannelChunkWriter::ChannelChunkWriter(OpenVDS::VDSHandle vds)
 ChannelChunkWriter::~ChannelChunkWriter()
 {
     if (m_pageAccessor) {
-        OpenVDS::Error error;
         m_pageAccessor->Commit();
-        m_accessManager.Flush(error);
-        if(error.code) {
-            m_logger->LogError(m_log_data, "Error {} writing {}", error.code, error.string);
-        } 
     }    
 
 }

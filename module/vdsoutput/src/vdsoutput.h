@@ -41,7 +41,7 @@ struct Vdsoutput {
     int batch_num;
 
 
-    std::map<std::string, AttributeFieldInfo> attributes;
+    std::unordered_map<std::string, AttributeFieldInfo> attributes;
     OpenVDS::CompressionMethod compression_method;
     float tolerance;
     int lod_levels;

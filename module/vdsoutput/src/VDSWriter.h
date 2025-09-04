@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <map>
+#include <unordered_map>
 #include <set>
 #include <cstring>
 #include "VDSHandler.h"
@@ -52,11 +52,11 @@ private:
     
     // Sliding windows for different data types
     std::unique_ptr<SlidingWindow> m_amplitudeWindow;
-    std::map<std::string, std::unique_ptr<SlidingWindow>> m_attributeWindows;
+    std::unordered_map<std::string, std::unique_ptr<SlidingWindow>> m_attributeWindows;
     
     // ChannelChunkWriter instances for different channels
     std::unique_ptr<ChannelChunkWriter> m_amplitudeChunkWriter;
-    std::map<std::string, std::unique_ptr<ChannelChunkWriter>> m_attributeChunkWriters;
+    std::unordered_map<std::string, std::unique_ptr<ChannelChunkWriter>> m_attributeChunkWriters;
     
     // Processing state
     int m_processedInlineCount = 0;
