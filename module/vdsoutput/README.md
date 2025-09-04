@@ -2,13 +2,14 @@
 
 ## Objective
 
-To write data to VDS format file with support for flexible data configuration and customizable headers.
+To write data to VDS format file with support for flexible data configuration and customizable channels.
 
 # Key Features
 
 - Supports writing data to a specified output file path
-- Allows configuration of trace header fields and custom attributes
-- Supports multiple data formats (int8, int16, int32, IEEE float)
-- Provides dry-run mode for validation without creating actual files
-- Configurable coordinate system (inline/crossline) mapping
-- Automatic VDS header generation with proper encoding
+- Allows configuration of trace header fields and custom channels
+- Supports multiple data formats (int8, int16, int32, float)
+- Supports multiple compression methods (none, zip, wavelet)
+- Supports different brick size
+- Supports different LOD levels
+
