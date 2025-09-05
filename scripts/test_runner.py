@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -566,7 +567,7 @@ class SingleTestRunner:
                 log_match_result=log_match_result
             )
         
-        command = f'source "{env_script}" && "{grun_script}" "{job_file.name}"'
+        command = f'source {shlex.quote(env_script)} && {shlex.quote(grun_script)} {shlex.quote(job_file.name)}'
         
         start_time = time.time()
         try:
