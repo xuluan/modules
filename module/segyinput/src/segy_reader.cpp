@@ -4,48 +4,6 @@
 
 #define DEBUG_DUMP 0
 
-namespace SEGY {
-
-    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness) {
-        if (!headerField.defined()) {
-            return;
-        }
-        
-        int index = headerField.byteLocation - 1;
-        auto signed_header = reinterpret_cast<const signed char *>(header);
-        auto unsigned_header = reinterpret_cast<const unsigned char *>(header);
-        
-        if (headerField.fieldWidth == 4) {
-            int32_t result;
-            if (endianness == Endianness::BigEndian) {
-                result = (int32_t)(signed_header[index + 0] << 24 | unsigned_header[index + 1] << 16 | 
-                               unsigned_header[index + 2] << 8 | unsigned_header[index + 3]);
-            } else {
-                result = (int32_t)(signed_header[index + 3] << 24 | unsigned_header[index + 2] << 16 | 
-                               unsigned_header[index + 1] << 8 | unsigned_header[index + 0]);
-            }
-            *reinterpret_cast<int32_t*>(data) = result;
-        } else if (headerField.fieldWidth == 2) {
-            int16_t result;
-            if (endianness == Endianness::BigEndian) {
-                result = (int16_t)(signed_header[index + 0] << 8 | unsigned_header[index + 1]);
-            } else {
-                result = (int16_t)(signed_header[index + 1] << 8 | unsigned_header[index + 0]);
-            }
-            *reinterpret_cast<int16_t*>(data) = result;
-        } else if (headerField.fieldWidth == 1) {
-            int8_t result = signed_header[index];
-            *reinterpret_cast<int8_t*>(data) = result;
-        }
-    }
-    
-    // Helper function for backward compatibility
-    int readFieldFromHeaderInt(const void *header, const HeaderField &headerField, Endianness endianness) {
-        int result = 0;
-        readFieldFromHeader(header, &result, headerField, endianness);
-        return result;
-    }
-}
 
 
 float Ibm2ieee(uint32_t fr)
@@ -214,13 +172,52 @@ void SEGYReader::addAttrField(const std::string& name, int byteLocation, int wid
     m_logger->LogInfo(m_log_data, "Added Attr field: {} at byte {} (width: {})", canonicalName, byteLocation, width);
 }
 
+void SEGYReader::readFieldFromHeader(const void *header, void *data, const SEGY::HeaderField &headerField, SEGY::Endianness endianness) {
+    if (!headerField.defined()) {
+        return;
+    }
+    
+    int index = headerField.byteLocation - 1;
+    auto signed_header = reinterpret_cast<const signed char *>(header);
+    auto unsigned_header = reinterpret_cast<const unsigned char *>(header);
+    
+    if (headerField.fieldWidth == 4) {
+        int32_t result;
+        if (endianness == SEGY::Endianness::BigEndian) {
+            result = (int32_t)(signed_header[index + 0] << 24 | unsigned_header[index + 1] << 16 | 
+                           unsigned_header[index + 2] << 8 | unsigned_header[index + 3]);
+        } else {
+            result = (int32_t)(signed_header[index + 3] << 24 | unsigned_header[index + 2] << 16 | 
+                           unsigned_header[index + 1] << 8 | unsigned_header[index + 0]);
+        }
+        *reinterpret_cast<int32_t*>(data) = result;
+    } else if (headerField.fieldWidth == 2) {
+        int16_t result;
+        if (endianness == SEGY::Endianness::BigEndian) {
+            result = (int16_t)(signed_header[index + 0] << 8 | unsigned_header[index + 1]);
+        } else {
+            result = (int16_t)(signed_header[index + 1] << 8 | unsigned_header[index + 0]);
+        }
+        *reinterpret_cast<int16_t*>(data) = result;
+    } else if (headerField.fieldWidth == 1) {
+        int8_t result = signed_header[index];
+        *reinterpret_cast<int8_t*>(data) = result;
+    }
+}
+
+int SEGYReader::readFieldFromHeaderInt(const void *header, const SEGY::HeaderField &headerField, SEGY::Endianness endianness) {
+    int result = 0;
+    readFieldFromHeader(header, &result, headerField, endianness);
+    return result;
+}
+
 SEGY::Endianness SEGYReader::detectEndianness(const char* binaryHeader, const char* firstTraceHeader) {
-    int intervalBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
-    int intervalLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
-    int samplesBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
-    int samplesLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
-    int formatBE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
-    int formatLE_bin = SEGY::readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
+    int intervalBE_bin = readFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::BigEndian);
+    int intervalLE_bin = readFieldFromHeaderInt(binaryHeader, m_fileInfo.sampleIntervalKey, SEGY::Endianness::LittleEndian);
+    int samplesBE_bin = readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::BigEndian);
+    int samplesLE_bin = readFieldFromHeaderInt(binaryHeader, m_fileInfo.numSamplesKey, SEGY::Endianness::LittleEndian);
+    int formatBE_bin = readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::BigEndian);
+    int formatLE_bin = readFieldFromHeaderInt(binaryHeader, m_fileInfo.dataSampleFormatCodeKey, SEGY::Endianness::LittleEndian);
 #if DEBUG_DUMP     
     m_logger->LogDebug(m_log_data, "Endianness detection:");
     m_logger->LogDebug(m_log_data, "Binary Header - BE: interval={}, samples={}, format={}", intervalBE_bin, samplesBE_bin, formatBE_bin);
@@ -260,7 +257,7 @@ void SEGYReader::buildSegmentInfo(std::ifstream& file) {
     file.read(traceHeader.data(), SEGY::TraceHeaderSize);
     if (file.gcount() != SEGY::TraceHeaderSize) return;
     
-    int currentPrimaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+    int currentPrimaryKey = readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
     SEGYSegmentInfo currentSegment(currentPrimaryKey, 0);
     
     m_logger->LogDebug(m_log_data, "Starting first segment with PrimaryKey: {}", currentPrimaryKey);
@@ -272,7 +269,7 @@ void SEGYReader::buildSegmentInfo(std::ifstream& file) {
         
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
-        int primaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+        int primaryKey = readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
         
         if (primaryKey == currentSegment.primaryKey) {
             // Extend current segment**
@@ -401,7 +398,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
         // **validation: Ensure trace belongs to correct segment**
-        int tracePrimaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
+        int tracePrimaryKey = readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.primaryKey, m_fileInfo.headerEndianness);
         if (tracePrimaryKey != segmentInfo.primaryKey) {
             m_logger->LogDebug(m_log_data, "Warning: trace {} has mismatched primary key {} vs expected {}", 
                                trace, tracePrimaryKey, segmentInfo.primaryKey);
@@ -409,7 +406,7 @@ bool SEGYReader::analyzeSegment(std::ifstream& file, const SEGYSegmentInfo& segm
         }
         
         // Read secondary key
-        int traceSecondaryKey = SEGY::readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.secondaryKey, m_fileInfo.headerEndianness);
+        int traceSecondaryKey = readFieldFromHeaderInt(traceHeader.data(), m_fileInfo.secondaryKey, m_fileInfo.headerEndianness);
         
         // **Precise gather analysis logic**
         if (gatherFold > 0 && traceSecondaryKey == gatherSecondaryKey) {
@@ -497,10 +494,10 @@ void SEGYReader::calculateCoordinateRanges() {
             
             if (file.gcount() != SEGY::TraceHeaderSize) break;
             
-            int inlineNum = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
+            int inlineNum = readFieldFromHeaderInt(traceHeader.data(), 
                 (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
                 m_fileInfo.headerEndianness);
-            int crosslineNum = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
+            int crosslineNum = readFieldFromHeaderInt(traceHeader.data(), 
                 (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
                 m_fileInfo.headerEndianness);
             
@@ -574,10 +571,10 @@ bool SEGYReader::verifyTraceCoordinates(std::ifstream& file, int64_t traceIndex,
     
     if (file.gcount() != SEGY::TraceHeaderSize) return false;
     
-    int actualInline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
+    int actualInline = readFieldFromHeaderInt(traceHeader.data(), 
         (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
         m_fileInfo.headerEndianness);
-    int actualCrossline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
+    int actualCrossline = readFieldFromHeaderInt(traceHeader.data(), 
         (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
         m_fileInfo.headerEndianness);
         
@@ -691,10 +688,10 @@ int64_t SEGYReader::findTraceNumber(std::ifstream& file, int inlineNum, int cros
         
         if (file.gcount() != SEGY::TraceHeaderSize) break;
         
-        int traceInline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
+        int traceInline = readFieldFromHeaderInt(traceHeader.data(), 
             (m_fileInfo.isPrimaryInline ? m_fileInfo.primaryKey : m_fileInfo.secondaryKey), 
             m_fileInfo.headerEndianness);
-        int traceCrossline = SEGY::readFieldFromHeaderInt(traceHeader.data(), 
+        int traceCrossline = readFieldFromHeaderInt(traceHeader.data(), 
             (m_fileInfo.isPrimaryInline ? m_fileInfo.secondaryKey : m_fileInfo.primaryKey), 
             m_fileInfo.headerEndianness);
         
@@ -764,9 +761,9 @@ bool SEGYReader::initialize(const std::string& m_filename) {
     m_fileInfo.headerEndianness = detectEndianness(binaryHeader.data(), firstTraceHeader.data());
     
     // Read file parameters
-    int interval = SEGY::readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
-    int samples = SEGY::readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
-    int format = SEGY::readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
+    int interval = readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.sampleIntervalKey, m_fileInfo.headerEndianness);
+    int samples = readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.numSamplesKey, m_fileInfo.headerEndianness);
+    int format = readFieldFromHeaderInt(binaryHeader.data(), m_fileInfo.dataSampleFormatCodeKey, m_fileInfo.headerEndianness);
 
     // If binary header invalid, read from trace header
     if (interval <= 0 || samples <= 0) {
@@ -1162,7 +1159,7 @@ bool SEGYReader::readAttrByPriIdx(std::string attr, int priIndex, int sndStart, 
                 return false;
             }
 
-            SEGY::readFieldFromHeader(traceHeader, &attrData[idx], attrField, m_fileInfo.headerEndianness);
+            readFieldFromHeader(traceHeader, &attrData[idx], attrField, m_fileInfo.headerEndianness);
             idx += size;
         }
 

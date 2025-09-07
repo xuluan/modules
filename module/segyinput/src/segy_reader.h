@@ -58,8 +58,6 @@ namespace SEGY {
         const HeaderField CrosslineNumberHeaderField(193, 4);
     }
     
-    // OpenVDS-style ReadFieldFromHeader implementation
-    void readFieldFromHeader(const void *header, void *data, const HeaderField &headerField, Endianness endianness);
 }
 
 // OpenVDS-style segment information structure
@@ -182,5 +180,9 @@ public:
     std::string getErrMsg() const { return m_lastError; }
 
     int getSampleCodeSize();
+    
+    // Header field reading functions (moved from SEGY namespace)
+    void readFieldFromHeader(const void *header, void *data, const SEGY::HeaderField &headerField, SEGY::Endianness endianness);
+    int readFieldFromHeaderInt(const void *header, const SEGY::HeaderField &headerField, SEGY::Endianness endianness);
     
 };
