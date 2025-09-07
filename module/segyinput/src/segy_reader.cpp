@@ -47,6 +47,126 @@ namespace SEGY {
     }
 }
 
+
+float Ibm2ieee(uint32_t fr)
+{
+    float dest;
+    void *to = &dest;
+
+    if (fr == 0)
+    { 
+      /* short-circuit for everything is zero. Then (also endian converted) matissa also is */
+
+      *(unsigned *)to = 0x00000000;
+
+      return dest;
+    }
+
+    unsigned int
+      sgn = fr & 0x80000000; /* save sign */
+
+    unsigned int
+      expIBM4 = (fr & 0x7f000000) >> 22;   // i.e. 4 * expIBM, shift (24 down and then 2 up in one go).
+
+    fr &= 0x00ffffff;
+
+    if (fr == 0)
+    { 
+      /* short-circuit for zero matissa*/
+      *(unsigned *)to = sgn;  // Matissa all zeroes, set exponent all zero, maintain sign.
+
+      return dest;
+    }
+
+    // The involved magic numbers will fall out when studying the IEEE and IBM representations.
+  
+    const bool
+      isNormalNumberEnsured = (expIBM4 > 154) && (expIBM4 < 385);
+
+    // Inside this range, none of the special considerations needs be taken. 
+
+    if (isNormalNumberEnsured)
+    {
+      // This approach should be SSE friendly, for further optimization.
+
+      // First let the CPU instruction convert the IBM matissa conversion into an IEEE float.
+      // This will handle the possible leading zeroes on the IBM matissa without any loop,
+      // or use of count leading zero instuction, which is not part of SSE (to the version
+      // we can currently assume in common use.)
+
+      float
+        rValue = float (fr);
+
+      uint32_t
+        uValue;
+      memcpy(&uValue, &rValue, sizeof(uValue));
+
+      // Then mod the exponent on the IEEE number, and we are done.
+
+      uint32_t
+        uExp = (expIBM4 - uint32_t(280)) << 23;
+
+      uValue = uValue + uExp; 
+
+      *(unsigned int*)to = (uValue | sgn);
+
+    }
+    else
+    {
+      // Note: This else clause is able to handle all cases (i.e. also the normal range above).
+
+       /*
+      adjust exponent from base 16 offset 64 radix point before first digit
+          to base 2 offset 127 radix point after first digit
+      (exp - 64) * 4 + 127 - 1 == exp * 4 - 256 + 126 == (exp << 2) - 130
+      */
+      int
+        expModified = expIBM4 - 130;
+
+      int
+        nNormalizeShift = 0;
+
+      /* normalize */
+      while (fr < 0x00800000)
+      {
+        fr <<= 1;
+        nNormalizeShift++;
+      }
+
+      expModified = expModified - nNormalizeShift;
+
+      if (expModified <= 0)
+      { 
+        /* underflow */
+        if (expModified < -23)
+        {
+          /* complete underflow - return properly signed zero */
+          fr = 0;
+        }
+        else
+        {
+          /* partial underflow - return denormalized number */
+          fr >>= 1-expModified;
+        }
+        expModified = 0;
+      }
+      else if (expModified >= 255)
+      { 
+        /* overflow - return infinity */
+        fr = 0;
+        expModified = 255;
+      }
+      else
+      { 
+        /* Standard number - assumed high bit masked away below */
+      }
+
+      *(unsigned *)to = (fr & 0x007fffff) | (expModified << 23) | sgn;  
+    }
+  return dest;
+}
+
+
 SEGYReader::SEGYReader() : m_initialized(false), m_log_data(NULL){
     // Initialize field aliases
     m_fieldAliases["inline"] = "inlinenumber";
@@ -760,6 +880,9 @@ int SEGYReader::getSampleCodeSize() {
         case SEGY::DataSampleFormatCode::IEEEFloat: {
             size = 4; break;
         }
+        case SEGY::DataSampleFormatCode::IBMFloat: {
+            size = 4; break;
+        }        
         case SEGY::DataSampleFormatCode::Int32: {
             size = 4; break;
         }
@@ -805,6 +928,19 @@ bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
     // Convert binary data to float based on data format
     if (m_fileInfo.headerEndianness == SEGY::Endianness::BigEndian) {
         switch (m_fileInfo.dataSampleFormatCode) {
+            case SEGY::DataSampleFormatCode::IBMFloat: {
+                // IBM 32-bit floating point
+                float* floatData = reinterpret_cast<float*>(data);
+                uint32_t* intData = reinterpret_cast<uint32_t*>(data);
+                for (int i = 0; i < m_fileInfo.sampleCount; i++) {
+                    uint32_t value = intData[i];
+                    uint32_t temp;
+                    //std::memcpy(&temp, &value, 4);
+                    temp = ntohl(value);
+                    floatData[i] = Ibm2ieee(temp);
+                }
+                break;
+            }
             case SEGY::DataSampleFormatCode::IEEEFloat: {
                 // IEEE 32-bit floating point
                 float* floatData = reinterpret_cast<float*>(data);
@@ -817,7 +953,7 @@ bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
                     floatData[i] = value;
                 }
                 break;
-            }
+            }            
             case SEGY::DataSampleFormatCode::Int32: {
                 // 32-bit integer
                 int32_t* intData = reinterpret_cast<int32_t*>(data);
@@ -848,6 +984,16 @@ bool SEGYReader::readTrace(std::ifstream& file, int64_t trace_num, char *data) {
                 }
                 break;
         }    
+    } else {
+        if(SEGY::DataSampleFormatCode::IBMFloat==m_fileInfo.dataSampleFormatCode)  {
+            // IBM 32-bit floating point
+            float* floatData = reinterpret_cast<float*>(data);
+            uint32_t* intData = reinterpret_cast<uint32_t*>(data);
+            for (int i = 0; i < m_fileInfo.sampleCount; i++) {
+                uint32_t value = static_cast<uint32_t>(intData[i]);
+                floatData[i] = Ibm2ieee(value);
+            }
+        }
     }
     
     return true;

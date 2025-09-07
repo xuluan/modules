@@ -203,8 +203,12 @@ void segyinput_init(const char* myid, const char* buf)
                 case SEGY::DataSampleFormatCode::IEEEFloat:
                     type = as::DataFormat::FORMAT_R32;
                     break;
+                case SEGY::DataSampleFormatCode::IBMFloat:
+                    type = as::DataFormat::FORMAT_R32;
+                    break;                    
                 default:
-                    throw std::runtime_error("Error: unsupported SEGY data sample format");
+                    throw std::runtime_error("Error: unsupported SEGY data sample format: " + std::to_string(static_cast<int>(format)));
+                    break;
             }
 
             gd_logger.LogInfo(my_logger, "trace type : {}", std::to_string(static_cast<int>(type)));
@@ -278,6 +282,27 @@ void segyinput_init(const char* myid, const char* buf)
         return;
     }
 
+}
+
+bool save_data_to_file(std::string output_filename,  const void* data, int length) {
+
+    auto& gd_logger = gdlog::GdLogger::GetInstance();
+    void* my_logger = gd_logger.Init("segyinput_save_data_to_file");
+
+    std::ofstream file(output_filename, std::ios::binary);
+    if (!file.is_open()) {
+        gd_logger.LogError(my_logger, "Failed to open output file: " + output_filename);
+        return false;
+    }
+
+    file.write(reinterpret_cast<const char*>(data), length);
+    if (!file.good()) {
+        gd_logger.LogError(my_logger, "Failed to write data to file: " + output_filename);
+        return false;
+    }
+    
+    file.close();
+    return true;
 }
 
 void segyinput_process(const char* myid)
@@ -371,6 +396,8 @@ void segyinput_process(const char* myid)
             if(!my_data->segy_reader.readTraceByPriIdx(my_data->current_pkey, my_data->fskey, my_data->lskey, my_data->trace_start, my_data->trace_end, data)) {
                 throw std::runtime_error("Error: read trace " + my_data->segy_reader.getErrMsg());
             }
+
+            //save_data_to_file(data_name+".DAT", data, my_data->num_skey * my_data->trace_length * my_data->segy_reader.getSampleCodeSize());
         } else {
             if(!my_data->segy_reader.readAttrByPriIdx(attr_name, my_data->current_pkey, my_data->fskey, my_data->lskey, data)) {
                 throw std::runtime_error("Error: read attribute " + my_data->segy_reader.getErrMsg());

@@ -145,7 +145,6 @@ private:
     
     char ebcdicToAscii(unsigned char ebcdicChar);
 
-    int getSampleCodeSize();
 public:
     SEGYReader();
     
@@ -181,5 +180,7 @@ public:
     bool getDataAxis(float& min_val, float& max_val, int& num_vals, int& sinterval);
 
     std::string getErrMsg() const { return m_lastError; }
+
+    int getSampleCodeSize();
     
 };
