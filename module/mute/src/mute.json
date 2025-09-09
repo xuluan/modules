@@ -1,0 +1,50 @@
+"name": "mute",
+"version": "1.0.0",
+"use_mpi": false,
+"use_cuda": false,
+"compare_direction": {
+  "type": "choice",
+  "required": true,
+  "help": "compare_direction",
+  "format": "text",
+  "default": "",
+  "options": [
+    "<",
+    ">"
+  ]  
+},
+"threshold": {
+  "required": true,
+  "repeatable": false,
+  "type": "option",
+  "help": "threshold",
+  "options": [
+    {
+    "value": {
+      "type": "argument",
+      "required": false,
+      "repetable": false,
+      "formt": "int",
+      "help": "threshold value",
+    }
+    },
+    {
+    "expr": {
+      "type": "argument",
+      "format": "text",
+      "required": false,
+      "repetable": false,
+      "default": "",
+      "width": "full",
+      "help": "The expression calculates the threshold value, which can include the following operators: +, -, *, /, sin, cos, tan, (, ), as well as integers, floating-point numbers and attribute names. "
+    },
+    }
+  ]
+},
+"tapering_window_size": {
+  "type": "argument",
+  "required": true,
+  "repetable": false,
+  "help": "The time window in ms",
+  "formt": "int"
+}
