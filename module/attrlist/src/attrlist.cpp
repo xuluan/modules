@@ -86,6 +86,7 @@ void attrlist_init(const char* myid, const char* buf)
         auto& attrs = config["attrlist"]["attributes"];
 
         if (attrs.is_array()) {
+            gd_logger.LogInfo(my_logger, "Attributes list:");
             auto& arr = attrs.as_array();
             for (size_t i = 0; i < arr.size(); ++i) {
                 as::DataFormat attr_fmt;
@@ -111,6 +112,7 @@ void attrlist_init(const char* myid, const char* buf)
             } 
         } else {
             // list all attribute if 'attribute' is miss
+            gd_logger.LogInfo(my_logger, "All Attributes:");
 
             for(int i = 0; i< job_df.GetNumAttributes(); i++) {
                 as::DataFormat attr_fmt;
