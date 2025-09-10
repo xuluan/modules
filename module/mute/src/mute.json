@@ -5,9 +5,9 @@
 "compare_direction": {
   "type": "choice",
   "required": true,
-  "help": "compare_direction",
+  "help": "Compare direction, options: <, >",
   "format": "text",
-  "default": "",
+  "default": ">",
   "options": [
     "<",
     ">"
@@ -22,22 +22,23 @@
     {
     "value": {
       "type": "argument",
-      "required": false,
+      "required": true,
       "repetable": false,
-      "formt": "int",
-      "help": "threshold value",
+      "format": "int",
+      "default":0,
+      "help": "The threshold value for the mute function."
     }
     },
     {
     "expr": {
       "type": "argument",
       "format": "text",
-      "required": false,
+      "required": true,
       "repetable": false,
       "default": "",
       "width": "full",
       "help": "The expression calculates the threshold value, which can include the following operators: +, -, *, /, sin, cos, tan, (, ), as well as integers, floating-point numbers and attribute names. "
-    },
+    }
     }
   ]
 },
@@ -45,6 +46,7 @@
   "type": "argument",
   "required": true,
   "repetable": false,
-  "help": "The time window in ms",
-  "formt": "int"
+  "help": "Tapering window size (Default: 20 ms), positive value: outer taper; negative value: inner taper; 0: no taper.",
+  "default": "20",
+  "format": "int"
 }

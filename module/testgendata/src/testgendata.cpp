@@ -132,7 +132,7 @@ void testgendata_init(const char* myid, const char* buf)
 
         // Add trace attribute
         job_df.AddAttribute(my_data->trace_name.c_str(), 
-                            as::DataFormat::FORMAT_R32, 
+                            t, 
                             my_data->trace_length);
         job_df.SetVolumeDataName(my_data->trace_name.c_str());
 

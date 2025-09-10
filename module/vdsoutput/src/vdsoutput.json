@@ -13,12 +13,21 @@
   "filefilter": "*.vds"
 },
 "brick_size":{
-  "type": "argument",
+  "type": "choice",
   "required": false,
   "help": "Set brick size of VDS chunks (default: 64)",
   "format": "int",
   "default": "64",
-  "width": "default"
+  "options": [
+    "32",
+    "64",
+    "128",
+    "256",
+    "512",
+    "1024",
+    "2048",
+    "4096"
+  ]  
 },
 "compression": {
   "type": "choice",
@@ -43,9 +52,9 @@
 "lod_levels":{
   "type": "argument",
   "required": false,
-  "help": "Set VDS LOD levels (default: 0)",
+  "help": "Set VDS LOD levels (default: 2)",
   "format": "int",
-  "default": "0",
+  "default": "4",
   "width": "default"
 },
 "attributes": {

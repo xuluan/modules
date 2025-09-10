@@ -104,19 +104,11 @@ void mute_init(const char* myid, const char* buf)
             if(!success) {
                 throw std::runtime_error(parser.get_errors());
             }
-            
-            int prev = -1;
-            std::string prev_name;
         
             for (const std::string& str : parser.get_used_variables()) {
-                if(prev == -1) {
-                    prev_name = str;
-                    prev = vars_map[str];
-                } else {
-                    if(prev != vars_map[str]) {
-                        throw std::runtime_error("Attribute lengths should be the same, but " 
-                            + prev_name + " = " + std::to_string(prev) + " vs " + str + " = " + std::to_string(vars_map[str]));                    
-                    } 
+
+                if(vars_map[str] != 1) {
+                    throw std::runtime_error("Attribute length should be 1, but " + str + " length = " + std::to_string(vars_map[str]));                    
                 }
             }
 
