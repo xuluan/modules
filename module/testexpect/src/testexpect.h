@@ -16,6 +16,10 @@ enum class CheckPattern {
     SAME,  //no change : same
     ATTRCALC_PLUS_MUL, //  INLINE+CROSSLINE*2.7
     ATTRCALC_COMPLEX_1, //  SIN((INLINE + CROSSLINE) * 0.1) + COS(INLINE * 0.2) * sin(tan(CROSSLINE))
+    MUTE_3000_9000_0,   // >9000, <3000, window_size=0
+    MUTE_3000_9000_PLUS_2000, // >9000, <3000, window_size=2000
+    MUTE_3000_9000_SUB_2000,  // >9000, <3000, window_size=-2000
+    MUTE_GT_EXPR_500_MUL_CROSSLINE, // >expr, expr=500*crossline
     CHECK_PATTERN_NUM
 };
 

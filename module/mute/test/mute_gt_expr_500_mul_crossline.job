@@ -1,0 +1,51 @@
+# {pass: yes, timeout: 300}
+- testgendata:
+    version: '1.0.0'
+    primarykey:
+      name: 'inline'
+      first: 1
+      last: 1
+      step: 1
+    secondarykey:
+      name: 'crossline'
+      first: 11
+      last: 30
+      step: 2
+    tracekey:
+      name: 'samples'
+      tmin: 1000
+      tmax: 13000
+      length: 24
+      unit: ms
+      data:
+        sequence:
+          type: float
+          min: 100
+          max: 100
+          step: 0
+- mute:
+    version: '1.0.0'
+    compare_direction: '>'
+    threshold:
+      expr: '500*crossline'
+    tapering_window_size: 0
+- testexpect:
+    version: '1.0.0'
+    primarykey:
+      name: 'inline'
+      first: 1
+      last: 1
+      step: 1
+    secondarykey:
+      name: 'crossline'
+      first: 11
+      last: 30
+      step: 2
+    tracekey:
+      name: 'samples'
+      tmin: 1000
+      tmax: 13000
+      length: 24
+      unit: ms
+      type: float
+      pattern: MUTE_GT_EXPR_500_MUL_CROSSLINE

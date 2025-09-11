@@ -14,6 +14,7 @@
 
 #include "common_expect.h"
 #include "attrcalc_expect.h"
+#include "mute_expect.h"
 
 #define FLOAT_EPSILON_TIMES 100
 #define DUMP_MAX_LEN 64
@@ -46,7 +47,10 @@ std::string to_string(CheckPattern c) {
         case CheckPattern::SKIP:    return "SKIP";
         case CheckPattern::ATTRCALC_PLUS_MUL:  return "ATTRCALC_PLUS_MUL";
         case CheckPattern::ATTRCALC_COMPLEX_1:  return "ATTRCALC_COMPLEX_1";
-
+        case CheckPattern::MUTE_3000_9000_0: return "MUTE_3000_9000_0";
+        case CheckPattern::MUTE_3000_9000_PLUS_2000: return "MUTE_3000_9000_PLUS_2000";
+        case CheckPattern::MUTE_3000_9000_SUB_2000: return "MUTE_3000_9000_SUB_2000";
+        case CheckPattern::MUTE_GT_EXPR_500_MUL_CROSSLINE: return "MUTE_GT_EXPR_250_MUL_CROSSLINE";
         default:  throw std::runtime_error("Error CheckPattern");
     }
 }
@@ -60,6 +64,14 @@ CheckPattern to_checkpattern(std::string s) {
         return CheckPattern::ATTRCALC_PLUS_MUL;
     } else if(s == "ATTRCALC_COMPLEX_1") {
         return CheckPattern::ATTRCALC_COMPLEX_1;
+    } else if(s == "MUTE_3000_9000_0") {
+        return CheckPattern::MUTE_3000_9000_0;
+    } else if(s == "MUTE_3000_9000_PLUS_2000") {
+        return CheckPattern::MUTE_3000_9000_PLUS_2000;
+    } else if(s == "MUTE_3000_9000_SUB_2000") {
+        return CheckPattern::MUTE_3000_9000_SUB_2000;
+    } else if(s == "MUTE_GT_EXPR_500_MUL_CROSSLINE") {
+        return CheckPattern::MUTE_GT_EXPR_500_MUL_CROSSLINE;
     } else {
         throw std::runtime_error("Unknown CheckPattern  : " + s);
     }
@@ -130,14 +142,23 @@ bool is_equal_float_double(float a, double b) {
 bool check_data(Testexpect* my_data, std::string  attr_name, AttrData& attr_data, std::map<std::string, AttrData>& variables, CheckPattern c)
 {
     switch(c) {
-        case CheckPattern::SAME:    
+        case CheckPattern::SAME:
             return check_data_same(my_data, attr_name, attr_data, variables);
         case CheckPattern::SKIP:    
             return check_data_skip(my_data, attr_name, attr_data, variables);            
         case CheckPattern::ATTRCALC_PLUS_MUL:  
             return check_data_plus_mul(my_data, attr_name, attr_data, variables);
         case CheckPattern::ATTRCALC_COMPLEX_1:  
-            return check_data_complex_1(my_data, attr_name, attr_data, variables);            
+            return check_data_complex_1(my_data, attr_name, attr_data, variables);
+        case CheckPattern::MUTE_3000_9000_0:
+            return check_data_mute_3000_9000_0(my_data, attr_name, attr_data, variables);
+        case CheckPattern::MUTE_3000_9000_PLUS_2000:
+            return check_data_mute_3000_9000_plus_2000(my_data, attr_name, attr_data, variables);
+        case CheckPattern::MUTE_3000_9000_SUB_2000:
+            return check_data_mute_3000_9000_sub_2000(my_data, attr_name, attr_data, variables);
+        case CheckPattern::MUTE_GT_EXPR_500_MUL_CROSSLINE:
+            return check_data_mute_gt_expr_500_mul_crossline(my_data, attr_name, attr_data, variables);
+
         default:  
             throw std::runtime_error("check_data fail: Error CheckPattern");
     }

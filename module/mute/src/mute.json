@@ -24,8 +24,8 @@
       "type": "argument",
       "required": true,
       "repetable": false,
-      "format": "int",
-      "default":0,
+      "format": "float",
+      "default":0.0,
       "help": "The threshold value for the mute function."
     }
     },
