@@ -243,7 +243,7 @@ void testexpect_init(const char* myid, const char* buf)
 
 
         my_data->attrs.emplace_back(my_data->trace_name, my_data->trace_unit
-            , my_data->trace_length, as::DataFormat::FORMAT_R32
+            , my_data->trace_length, as::string_to_data_format(tracekey.at("type", "tracekey").as_string() )
             , to_checkpattern(pattern)); 
 
         //parse attributes
