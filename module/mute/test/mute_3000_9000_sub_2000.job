@@ -15,7 +15,7 @@
       name: 'samples'
       tmin: 1000
       tmax: 13000
-      length: 24
+      length: 25
       unit: ms
       data:
         sequence:
@@ -51,7 +51,7 @@
       name: 'samples'
       tmin: 1000
       tmax: 13000
-      length: 24
+      length: 25
       unit: ms
       type: float
       pattern: MUTE_3000_9000_SUB_2000

@@ -15,7 +15,7 @@
       name: 'samples'
       tmin: 1000
       tmax: 13000
-      length: 24
+      length: 25
       unit: ms
       data:
         sequence:
@@ -45,7 +45,7 @@
       name: 'samples'
       tmin: 1000
       tmax: 13000
-      length: 24
+      length: 25
       unit: ms
       type: float
       pattern: MUTE_GT_EXPR_500_MUL_CROSSLINE
