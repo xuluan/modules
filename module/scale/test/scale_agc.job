@@ -1,0 +1,47 @@
+- testgendata:
+    version: '1.0.0'
+    primarykey:
+      name: 'inline'
+      first: 1
+      last: 10
+      step: 1
+    secondarykey:
+      name: 'crossline'
+      first: 1
+      last: 10
+      step: 1
+    tracekey:
+      name: 'samples'
+      tmin: 0
+      tmax: 5000
+      length: 1001
+      unit: ms
+      data:
+        random:
+          type: float
+          min: -1
+          max: 1
+- scale:
+    version: '1.0.0'
+    agc:
+      window_size: 500  #  'gate_length' for get_agc_data(data, dt, gate_length):
+- testexpect:
+    version: '1.0.0'
+    primarykey:
+      name: 'inline'
+      first: 1
+      last: 10
+      step: 1
+    secondarykey:
+      name: 'crossline'
+      first: 1
+      last: 10
+      step: 1
+    tracekey:
+      name: 'samples'
+      tmin: 0
+      tmax: 5000
+      length: 1001
+      unit: ms
+      type: float
+      pattern: SCALE_AGC

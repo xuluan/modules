@@ -15,6 +15,7 @@
 #include "common_expect.h"
 #include "attrcalc_expect.h"
 #include "mute_expect.h"
+#include "scale_expect.h"
 
 #define FLOAT_EPSILON_TIMES 100
 #define DUMP_MAX_LEN 64
@@ -51,6 +52,10 @@ std::string to_string(CheckPattern c) {
         case CheckPattern::MUTE_3000_9000_PLUS_2000: return "MUTE_3000_9000_PLUS_2000";
         case CheckPattern::MUTE_3000_9000_SUB_2000: return "MUTE_3000_9000_SUB_2000";
         case CheckPattern::MUTE_GT_EXPR_500_MUL_CROSSLINE: return "MUTE_GT_EXPR_250_MUL_CROSSLINE";
+        case CheckPattern::SCALE_FACTOR: return "SCALE_FACTOR";
+        case CheckPattern::SCALE_EXPR: return "SCALE_EXPR";
+        case CheckPattern::SCALE_AGC: return "SCALE_AGC";
+        case CheckPattern::SCALE_DIVERGE: return "SCALE_DIVERGE";
         default:  throw std::runtime_error("Error CheckPattern");
     }
 }
@@ -72,6 +77,14 @@ CheckPattern to_checkpattern(std::string s) {
         return CheckPattern::MUTE_3000_9000_SUB_2000;
     } else if(s == "MUTE_GT_EXPR_500_MUL_CROSSLINE") {
         return CheckPattern::MUTE_GT_EXPR_500_MUL_CROSSLINE;
+    } else if(s == "SCALE_FACTOR") {
+        return CheckPattern::SCALE_FACTOR;
+    } else if(s == "SCALE_EXPR") {
+        return CheckPattern::SCALE_EXPR;
+    } else if(s == "SCALE_AGC") {
+        return CheckPattern::SCALE_AGC;
+    } else if(s == "SCALE_DIVERGE") {
+        return CheckPattern::SCALE_DIVERGE;
     } else {
         throw std::runtime_error("Unknown CheckPattern  : " + s);
     }
@@ -139,6 +152,57 @@ bool is_equal_float_double(float a, double b) {
     return diff < epsilon;
 }
 
+
+// whether it is equal to the data at the specified index
+bool is_equal_to_specified_data(void* data, size_t data_len, size_t data_idx, as::DataFormat data_fmt, double b) {
+
+    const float epsilon = std::numeric_limits<float>::epsilon() * FLOAT_EPSILON_TIMES;
+
+    if(data == nullptr) {
+        throw std::runtime_error("is_equal_data fail: data is NULL");
+    }
+
+    if (data_idx >= data_len) {
+        throw std::runtime_error("is_equal_data fail: index is out of range");
+    }
+
+    switch (data_fmt) {
+        case as::DataFormat::FORMAT_U8:
+        {
+            int8_t *data_int8 = static_cast<int8_t *>(data);
+            return data_int8[data_idx] ==  static_cast<int8_t>(b);
+        }
+        case as::DataFormat::FORMAT_U16:
+        {
+            int16_t *data_int16 = static_cast<int16_t *>(data);
+            return data_int16[data_idx] ==  static_cast<int16_t>(b);
+        }
+        case as::DataFormat::FORMAT_U32:
+        {
+            int32_t *data_int32 = static_cast<int32_t *>(data);
+            return data_int32[data_idx] ==  static_cast<int32_t>(b);
+        }
+        case as::DataFormat::FORMAT_U64:
+        {
+            int64_t *data_int64 = static_cast<int64_t *>(data);
+            return data_int64[data_idx] ==  static_cast<int64_t>(b);
+        }
+        case as::DataFormat::FORMAT_R32:
+        {
+            float *data_float = static_cast<float *>(data);
+            return std::fabs(static_cast<double>(data_float[data_idx]) - b) < epsilon;
+        }
+        case as::DataFormat::FORMAT_R64:
+        {
+            double *data_double = static_cast<double *>(data);
+            return std::fabs(data_double[data_idx] - b) < epsilon;
+        }
+        default:
+            return false;
+    }
+
+}
+
 bool check_data(Testexpect* my_data, std::string  attr_name, AttrData& attr_data, std::map<std::string, AttrData>& variables, CheckPattern c)
 {
     switch(c) {
@@ -158,8 +222,13 @@ bool check_data(Testexpect* my_data, std::string  attr_name, AttrData& attr_data
             return check_data_mute_3000_9000_sub_2000(my_data, attr_name, attr_data, variables);
         case CheckPattern::MUTE_GT_EXPR_500_MUL_CROSSLINE:
             return check_data_mute_gt_expr_500_mul_crossline(my_data, attr_name, attr_data, variables);
-
-        default:  
+        case CheckPattern::SCALE_FACTOR:
+            return check_data_scale_factor(my_data, attr_name, attr_data, variables);
+        case CheckPattern::SCALE_AGC:
+            return check_data_scale_agc(my_data, attr_name, attr_data, variables);
+        case CheckPattern::SCALE_DIVERGE:
+            return check_data_scale_diverge(my_data, attr_name, attr_data, variables);
+        default:
             throw std::runtime_error("check_data fail: Error CheckPattern");
     }
 }
@@ -239,11 +308,8 @@ void testexpect_init(const char* myid, const char* buf)
         std::string pattern = tracekey.at("pattern", "tracekey").as_string();
         gutl::UTL_StringToUpperCase(pattern);
 
-        
-
-
         my_data->attrs.emplace_back(my_data->trace_name, my_data->trace_unit
-            , my_data->trace_length, as::string_to_data_format(tracekey.at("type", "tracekey").as_string() )
+            , my_data->trace_length, as::string_to_data_format(tracekey.at("type", "tracekey").as_string())
             , to_checkpattern(pattern)); 
 
         //parse attributes

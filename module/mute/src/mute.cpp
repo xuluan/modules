@@ -50,7 +50,7 @@ void mute_init(const char* myid, const char* buf)
 
         if (mod_conf.Has("mute.threshold.value")) {
             my_data->expr_enable = false;
-            my_data->threshold_value = mod_conf.GetInt("mute.threshold.value");
+            my_data->threshold_value = mod_conf.GetFloat("mute.threshold.value");
             if(mod_conf.HasError()) {
                 throw std::runtime_error("Failed to get mute threshold.value. Error: " + mod_conf.ErrorMessage());
             }
@@ -162,7 +162,7 @@ void mute_process(const char* myid)
 
         // 1. Calculate the value of the threshold. 
         
-        std::vector<int> threshold_values(grp_size);
+        std::vector<float> threshold_values(grp_size);
 
         if (my_data->expr_enable) {
 
@@ -194,13 +194,12 @@ void mute_process(const char* myid)
                 throw std::runtime_error(evaluator.get_errors());
             }
 
-            // Convert data type to integer
-            std::transform(result_data.begin(), result_data.end(), threshold_values.begin(),
-                 [](auto val) { return int(val); }); 
+            // Convert data type to float
+            attr_data = {threshold_values.data(),  (size_t)grp_size, as::DataFormat::FORMAT_R32};
+            gexpr::convert_vector(&attr_data, &result_attr);
 
-            // for(int i = 0; i< result_data.size(); i++){
-            //     gd_logger.LogInfo(my_logger, "threshold[{}]={}", i, result_data[i]);
-            // }
+            // std::transform(result_data.begin(), result_data.end(), threshold_values.begin(),
+            //      [](auto val) { return int(val); }); 
 
         } else {
             // Threshold value
@@ -226,8 +225,9 @@ void mute_process(const char* myid)
         
         job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, length, trc_min, trc_max);
         job_df.GetDataAxis(trc_min, trc_max, length);
-        trc_step = (trc_max - trc_min)/length;
-        float *trc = static_cast<float*>(job_df.GetWritableBuffer(trc_name.c_str()));
+        trc_step = (trc_max - trc_min)/(length-1);
+
+        void *trc = static_cast<void *>(job_df.GetWritableBuffer(trc_name.c_str()));
         if (trc == nullptr) {
             gd_logger.LogError(my_logger, "Failed to get buffer to write for dataname. Error: {}");
             // cancel the job
@@ -241,7 +241,8 @@ void mute_process(const char* myid)
 
         for(int i=0; i<grp_size; i++) {
 
-            int wind_left, wind_right, tapering_window_size;
+            float wind_left, wind_right;
+            int tapering_window_size;
 
             // Mute range and window position
 
@@ -277,7 +278,7 @@ void mute_process(const char* myid)
 
             for(int trc_idx=0; trc_idx < trc_length; trc_idx++){
                 // ">"
-                int time_offset = trc_min + trc_idx*trc_step;
+                float time_offset = trc_min + trc_idx*trc_step;
 
                 if (my_data->compare_direction == ">") {
                     
@@ -319,36 +320,6 @@ void mute_process(const char* myid)
         std::vector<double> mute_result_data(grp_size*trc_length);
         gexpr::AttrData mute_result_attr = {mute_result_data.data(), (size_t)trc_length*grp_size, as::DataFormat::FORMAT_R64};
 
-        // gexpr::ExpressionEvaluator mute_evaluator;
-        // std::string mute_expression_string = trc_name + "*FACTOR";
-        // gexpr::ExpressionTree mute_expression;
-
-        // std::map<std::string, gexpr::AttrData> mute_variables;
-        // gexpr::AttrData mute_attr_data;
-
-        // std::vector<std::string> mute_variables_name = {trc_name, "FACTOR"};
-        
-        // mute_attr_data = {job_df.GetWritableBuffer(trc_name.c_str()),  (size_t)grp_size * trc_length, trc_fmt};
-        // mute_variables[trc_name] = mute_attr_data;
-
-        // mute_attr_data = {mute_factors.data(), (size_t)grp_size * trc_length, as::DataFormat::FORMAT_R32};
-        // mute_variables["FACTOR"] = mute_attr_data;
-
-        // gexpr::ExpressionParser mute_parser;
-        // bool mute_success;
-        // mute_success = mute_parser.parse(mute_expression_string, mute_variables_name, mute_expression);
-
-        // if(!mute_success) {
-        //     throw std::runtime_error(mute_parser.get_errors());
-        // } else {
-        //     gd_logger.LogInfo(my_logger, "expression parse success." + mute_expression_string);
-        // }
-
-        // mute_success = mute_evaluator.evaluate(mute_expression, mute_variables, &mute_result_attr);
-        // if(!mute_success) {
-        //     throw std::runtime_error(mute_evaluator.get_errors());
-        // }
-
         // Use vector_compute() to compute the result
         
         gexpr::AttrData mute_attr_data_trc, mute_attr_data_factor, mute_attr_data;
@@ -364,10 +335,9 @@ void mute_process(const char* myid)
 #if DEBUG_DUMP 
         for( int skey_idx = 0; skey_idx < grp_size; skey_idx++ ) {
             for ( int trc_idx = 0; trc_idx < trc_length; trc_idx++ ) {
-                auto *data = trc + skey_idx * trc_length + trc_idx;
-                gd_logger.LogInfo(my_logger, "Trace Data[{:2}][{:2}] time={:8}ms {:8.2f} * {:4.2f} = {:8.2f}",
+                gd_logger.LogInfo(my_logger, "Trace Data[{:2}][{:2}] time={:8}ms ? * {:4.2f} = {:8.2f}",
                     skey_idx, trc_idx, trc_min+trc_idx*trc_step,
-                    trc[skey_idx*trc_length + trc_idx], 
+                    // trc_int32[skey_idx*trc_length + trc_idx], 
                     mute_factors[skey_idx*trc_length + trc_idx], 
                     mute_result_data[skey_idx*trc_length + trc_idx]);
             }
@@ -377,12 +347,6 @@ void mute_process(const char* myid)
         mute_attr_data = {job_df.GetWritableBuffer(trc_name.c_str()),  (size_t)grp_size * trc_length, trc_fmt};
         gexpr::convert_vector(&mute_attr_data, &mute_result_attr);
 
-        // for( int skey_idx = 0; skey_idx < grp_size; skey_idx++ ) {
-        //     for ( int trc_idx = 0; trc_idx < trc_length; trc_idx++ ) {
-        //         auto *data = trc + skey_idx * trc_length + trc_idx;
-        //         gd_logger.LogInfo(my_logger, "Trace Data[{:2}][{:2}] = {}", skey_idx, trc_idx, *data);
-        //     }
-        // }
 
         gd_logger.LogInfo(my_logger, "Process primary key {} finished.", pkey[0]);
         

@@ -20,6 +20,10 @@ enum class CheckPattern {
     MUTE_3000_9000_PLUS_2000, // >9000, <3000, window_size=2000
     MUTE_3000_9000_SUB_2000,  // >9000, <3000, window_size=-2000
     MUTE_GT_EXPR_500_MUL_CROSSLINE, // >expr, expr=500*crossline
+    SCALE_FACTOR,
+    SCALE_EXPR,
+    SCALE_AGC,
+    SCALE_DIVERGE,
     CHECK_PATTERN_NUM
 };
 
@@ -71,6 +75,8 @@ std::string to_string(CheckPattern c);
 CheckPattern to_checkpattern(std::string s);
 void* get_and_check_data_valid(Testexpect* my_data, std::string  attr_name, int length, as::DataFormat format, std::map<std::string, AttrData>& variables);
 bool is_equal_float_double(float a, double b);
+bool is_equal_to_specified_data(void* data, size_t data_len, size_t data_idx, as::DataFormat data_fmt, double b);
+bool load_data (std::vector<char>& data, const std::string& file_name, size_t length);
 
 #ifdef __cplusplus
     extern "C" {

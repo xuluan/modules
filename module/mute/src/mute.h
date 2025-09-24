@@ -9,7 +9,7 @@ struct Mute {
 
     void* logger;
     std::string compare_direction;
-    int threshold_value;
+    float threshold_value;
     bool expr_enable;
     std::string threshold_expr;
     int tapering_window_size;

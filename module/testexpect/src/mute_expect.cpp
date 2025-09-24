@@ -13,7 +13,7 @@ bool check_data_mute_3000_9000_0(Testexpect* my_data, std::string&  attr_name, A
     
     int length =  attr_data.length;
 
-    float* dst = static_cast<float *> (attr_data.data);
+    void* dst = static_cast<void *> (attr_data.data);
 
     if( !dst) {
         throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
@@ -26,18 +26,18 @@ bool check_data_mute_3000_9000_0(Testexpect* my_data, std::string&  attr_name, A
 
     std::string trc_name = job_df.GetVolumeDataName();
     as::DataFormat trc_fmt;
-    int ttt_length;
+    int trc_len;
     float trc_min; 
     float trc_max;
     float trc_step;
     int time_offset;
-    float except_val;
+    double except_val;
     int grp_id;
     int trc_id;
     
-    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, ttt_length, trc_min, trc_max);
-    job_df.GetDataAxis(trc_min, trc_max, ttt_length);
-    trc_step = (trc_max - trc_min)/trc_length;
+    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, trc_len, trc_min, trc_max);
+    job_df.GetDataAxis(trc_min, trc_max, trc_len);
+    trc_step = (trc_max - trc_min)/(trc_length-1);
 
 
     for(int i = 0; i < length; ++i) {
@@ -54,13 +54,11 @@ bool check_data_mute_3000_9000_0(Testexpect* my_data, std::string&  attr_name, A
         } else {
             except_val = 100.0;
         }
-
-        if(!is_equal_float_double(dst[i], except_val)) {
-            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} val={} expect={}",
-                 i, grp_id, trc_id, time_offset, dst[i], except_val);
-            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val) + " but got " + std::to_string(dst[i]));
-        } 
-
+        if (!is_equal_to_specified_data(dst, length, i, trc_fmt, except_val)) {
+            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} expect={}",
+                 i, grp_id, trc_id, time_offset, except_val);
+            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val));
+        }
 
     }
 
@@ -74,7 +72,7 @@ bool check_data_mute_3000_9000_plus_2000(Testexpect* my_data, std::string&  attr
     
     int length =  attr_data.length;
 
-    float* dst = static_cast<float *> (attr_data.data);
+    void* dst = static_cast<void *> (attr_data.data);
 
     if( !dst) {
         throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
@@ -87,18 +85,18 @@ bool check_data_mute_3000_9000_plus_2000(Testexpect* my_data, std::string&  attr
 
     std::string trc_name = job_df.GetVolumeDataName();
     as::DataFormat trc_fmt;
-    int ttt_length;
+    int trc_len;
     float trc_min; 
     float trc_max;
     float trc_step;
     int time_offset;
-    float except_val;
+    double except_val;
     int grp_id;
     int trc_id;
     
-    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, ttt_length, trc_min, trc_max);
-    job_df.GetDataAxis(trc_min, trc_max, ttt_length);
-    trc_step = (trc_max - trc_min)/trc_length;
+    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, trc_len, trc_min, trc_max);
+    job_df.GetDataAxis(trc_min, trc_max, trc_len);
+    trc_step = (trc_max - trc_min)/(trc_length-1);
 
 
     for(int i = 0; i < length; ++i) {
@@ -120,12 +118,11 @@ bool check_data_mute_3000_9000_plus_2000(Testexpect* my_data, std::string&  attr
             except_val = 100.0;
         }
 
-        if(!is_equal_float_double(dst[i], except_val)) {
-            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} val={} expect={}",
-                 i, grp_id, trc_id, time_offset, dst[i], except_val);
-            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val) + " but got " + std::to_string(dst[i]));
-        } 
-
+        if (!is_equal_to_specified_data(dst, length, i, trc_fmt, except_val)) {
+            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} expect={}",
+                 i, grp_id, trc_id, time_offset, except_val);
+            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val));
+        }
 
     }
 
@@ -139,7 +136,7 @@ bool check_data_mute_3000_9000_sub_2000(Testexpect* my_data, std::string&  attr_
     
     int length =  attr_data.length;
 
-    float* dst = static_cast<float *> (attr_data.data);
+    void* dst = static_cast<void *> (attr_data.data);
 
     if( !dst) {
         throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
@@ -152,18 +149,18 @@ bool check_data_mute_3000_9000_sub_2000(Testexpect* my_data, std::string&  attr_
 
     std::string trc_name = job_df.GetVolumeDataName();
     as::DataFormat trc_fmt;
-    int ttt_length;
+    int trc_len;
     float trc_min; 
     float trc_max;
     float trc_step;
     int time_offset;
-    float except_val;
+    double except_val;
     int grp_id;
     int trc_id;
     
-    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, ttt_length, trc_min, trc_max);
-    job_df.GetDataAxis(trc_min, trc_max, ttt_length);
-    trc_step = (trc_max - trc_min)/trc_length;
+    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, trc_len, trc_min, trc_max);
+    job_df.GetDataAxis(trc_min, trc_max, trc_len);
+    trc_step = (trc_max - trc_min)/(trc_length-1);
 
 
     for(int i = 0; i < length; ++i) {
@@ -185,11 +182,11 @@ bool check_data_mute_3000_9000_sub_2000(Testexpect* my_data, std::string&  attr_
             except_val = 100.0;
         }
 
-        if(!is_equal_float_double(dst[i], except_val)) {
-            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} val={} expect={}",
-                 i, grp_id, trc_id, time_offset, dst[i], except_val);
-            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val) + " but got " + std::to_string(dst[i]));
-        } 
+        if (!is_equal_to_specified_data(dst, length, i, trc_fmt, except_val)) {
+            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} expect={}",
+                 i, grp_id, trc_id, time_offset, except_val);
+            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val));
+        }
 
 
     }
@@ -204,7 +201,7 @@ bool check_data_mute_gt_expr_500_mul_crossline(Testexpect* my_data, std::string&
     
     int length =  attr_data.length;
 
-    float* dst = static_cast<float *> (attr_data.data);
+    void* dst = static_cast<void *> (attr_data.data);
 
     gd_logger.LogInfo(my_data->logger, "length={}", length);
 
@@ -212,8 +209,6 @@ bool check_data_mute_gt_expr_500_mul_crossline(Testexpect* my_data, std::string&
         throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
     }
 
-    
-    
     // get time info
     auto& job_df = df::GeoDataFlow::GetInstance();
     size_t grp_size = job_df.GetGroupSize();
@@ -221,19 +216,19 @@ bool check_data_mute_gt_expr_500_mul_crossline(Testexpect* my_data, std::string&
 
     std::string trc_name = job_df.GetVolumeDataName();
     as::DataFormat trc_fmt;
-    int ttt_length;
+    int trc_len;
     float trc_min; 
     float trc_max;
     float trc_step;
     int time_offset;
-    float except_val;
+    double except_val;
     int grp_id;
     int trc_id;
     int threshold_val;
     
-    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, ttt_length, trc_min, trc_max);
-    job_df.GetDataAxis(trc_min, trc_max, ttt_length);
-    trc_step = (trc_max - trc_min)/trc_length;
+    job_df.GetAttributeInfo(trc_name.c_str(), trc_fmt, trc_len, trc_min, trc_max);
+    job_df.GetDataAxis(trc_min, trc_max, trc_len);
+    trc_step = (trc_max - trc_min)/(trc_length-1);
 
 
     for(int i = 0; i < length; ++i) {
@@ -253,12 +248,11 @@ bool check_data_mute_gt_expr_500_mul_crossline(Testexpect* my_data, std::string&
             except_val = 100.0;
         }
 
-        if(!is_equal_float_double(dst[i], except_val)) {
-            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} val={} expect={}",
-                 i, grp_id, trc_id, time_offset, dst[i], except_val);
-            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val) + " but got " + std::to_string(dst[i]));
-        } 
-
+        if (!is_equal_to_specified_data(dst, length, i, trc_fmt, except_val)) {
+            gd_logger.LogInfo(my_data->logger, "idx={} [{}][{}] time_offset={} expect={}",
+                 i, grp_id, trc_id, time_offset, except_val);
+            throw std::runtime_error("check_data fail, at index " + std::to_string(i) + ", expect " + std::to_string(except_val));
+        }
 
     }
 
