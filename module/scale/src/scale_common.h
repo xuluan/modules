@@ -11,4 +11,4 @@ bool conv_2d_double_to_void_ptr(void* trc_data, size_t grp_size, size_t trc_len,
 
 
 
-#endif /* ifndef SCALE_H */
+#endif /* ifndef SCALE_COMMON_H */
