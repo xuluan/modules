@@ -23,8 +23,9 @@
           max: 1
 - scale:
     version: '1.0.0'
-    agc:
-      window_size: 500  #  'gate_length' for get_agc_data(data, dt, gate_length):
+    method:
+      - agc:
+          window_size: 500
 - testexpect:
     version: '1.0.0'
     primarykey:

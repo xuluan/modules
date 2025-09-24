@@ -23,9 +23,10 @@
           max: 1
 - scale:
     version: '1.0.0'
-    diverge:
-      a: 2.0           # Divergence Compensation Index
-      v: 1.0           # Velocity Coefficient
+    method:
+      - diverge:
+          a: 2.0           # Divergence Compensation Index
+          v: 1.0           # Velocity Coefficient
 - testexpect:
     version: '1.0.0'
     primarykey:

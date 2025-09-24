@@ -24,8 +24,9 @@
     attribute:
 - scale:
     version: '1.0.0'
-    factor: 
-      value: 0.5
+    method:
+      - factor: 
+          value: 0.5
 - testexpect:
     version: '1.0.0'
     primarykey:

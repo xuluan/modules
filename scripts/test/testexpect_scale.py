@@ -220,8 +220,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-m', '--mode', required=True, choices=mode_choices,
-                        help='scaling mode.')
+    parser.add_argument('-m', '--method', required=True, choices=mode_choices,
+                        help='scaling method.')
 
     parser.add_argument('--attrname', required=True,
                         help='attribute name.')
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.mode == 'factor':
+    if args.method == 'factor':
     
         scale_factor(attrname=args.attrname, 
             group_size=args.group_size,
@@ -272,14 +272,14 @@ if __name__ == "__main__":
             data_type=args.data_type,
             factor=0.5)
         
-    elif args.mode == 'agc':
+    elif args.method == 'agc':
         scale_agc(attrname=args.attrname, 
             group_size=args.group_size,
             trace_length=args.trace_length, 
             data_type=args.data_type,
             sinterval=args.sinterval,
             window_size=500)
-    elif args.mode == 'diverge':
+    elif args.method == 'diverge':
         scale_diverge(attrname=args.attrname,
             group_size=args.group_size,
             trace_length=args.trace_length, 

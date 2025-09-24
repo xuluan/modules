@@ -31,45 +31,47 @@ void scale_init(const char* myid, const char* buf)
     };
 
     // parse job parameters
-    mc::ModuleConfig mod_conf = mc::ModuleConfig {};    mod_conf.Parse(buf);
+    mc::ModuleConfig mod_conf = mc::ModuleConfig {};
+    
+    mod_conf.Parse(buf);
 
-    if (mod_conf.Has("scale.factor")) {
-        my_data->mode = SCALE_MODE_FACTOR;
-        my_data->factor = mod_conf.GetFloat("scale.factor.value");
+    if (mod_conf.Has("scale.method.factor")) {
+        my_data->method = SCALE_METHOD_FACTOR;
+        my_data->factor = mod_conf.GetFloat("scale.method.factor.value");
         if(mod_conf.HasError()) {
-            gd_logger.LogError(my_logger, "Failed to get scale.factor. Error: {}", mod_conf.ErrorMessage().c_str());
+            gd_logger.LogError(my_logger, "Failed to get scale.method.factor. Error: {}", mod_conf.ErrorMessage().c_str());
             job_df.SetJobAborted();
             _clean_up();
             return;
         }
-    } else if (mod_conf.Has("scale.agc")) {
-        my_data->mode = SCALE_MODE_AGC;
-        my_data->window_size = mod_conf.GetFloat("scale.agc.window_size");
+    } else if (mod_conf.Has("scale.method.agc")) {
+        my_data->method = SCALE_METHOD_AGC;
+        my_data->window_size = mod_conf.GetFloat("scale.method.agc.window_size");
         if(mod_conf.HasError()) {
-            gd_logger.LogError(my_logger, "Failed to get 'scale.agc.window_size'. Error: {}", mod_conf.ErrorMessage().c_str());
+            gd_logger.LogError(my_logger, "Failed to get 'scale.method.agc.window_size'. Error: {}", mod_conf.ErrorMessage().c_str());
             job_df.SetJobAborted();
             _clean_up();
             return;
         }
         
-    } else if    (mod_conf.Has("scale.diverge")) {
-        my_data->mode = SCALE_MODE_DIVERGE;
-        my_data->dvg_a = mod_conf.GetFloat("scale.diverge.a");
+    } else if    (mod_conf.Has("scale.method.diverge")) {
+        my_data->method = SCALE_METHOD_DIVERGE;
+        my_data->dvg_a = mod_conf.GetFloat("scale.method.diverge.a");
         if(mod_conf.HasError()) {
-            gd_logger.LogError(my_logger, "Failed to get 'scale.diverge.a'. Error: {}", mod_conf.ErrorMessage().c_str());
+            gd_logger.LogError(my_logger, "Failed to get 'scale.method.diverge.a'. Error: {}", mod_conf.ErrorMessage().c_str());
             job_df.SetJobAborted();
             _clean_up();
             return;
         }
-        my_data->dvg_v = mod_conf.GetFloat("scale.diverge.v");
+        my_data->dvg_v = mod_conf.GetFloat("scale.method.diverge.v");
         if(mod_conf.HasError()) {
-            gd_logger.LogError(my_logger, "Failed to get 'scale.diverge.v'. Error: {}", mod_conf.ErrorMessage().c_str());
+            gd_logger.LogError(my_logger, "Failed to get 'scale.method.diverge.v'. Error: {}", mod_conf.ErrorMessage().c_str());
             job_df.SetJobAborted();
             _clean_up();
             return;
         }
     } else {
-        gd_logger.LogError(my_logger, "Error: unknown scaling mode");
+        gd_logger.LogError(my_logger, "Error: unknown scaling method");
         job_df.SetJobAborted();
         _clean_up();
     }
@@ -140,11 +142,11 @@ void scale_process(const char* myid)
     my_data->sinterval = (trc_max-trc_min)/(my_data->trc_len -1);
 
 
-    if (my_data->mode == SCALE_MODE_FACTOR) {
+    if (my_data->method == SCALE_METHOD_FACTOR) {
         get_scale_data_factor(my_data);
-    } else if (my_data->mode == SCALE_MODE_AGC) {
+    } else if (my_data->method == SCALE_METHOD_AGC) {
         get_scale_data_agc(my_data);
-    } else if (my_data->mode == SCALE_MODE_DIVERGE) {
+    } else if (my_data->method == SCALE_METHOD_DIVERGE) {
         get_scale_data_diverge(my_data);
     }
 

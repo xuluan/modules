@@ -16,7 +16,18 @@ bool get_diverge_data(
 {
 
     size_t data_width = in_data.size();
+
+    if (data_width < 1) {
+        throw std::runtime_error("invalid 'in_data' parameter, width is 0.");
+        return false;   
+    }
+
     size_t data_height = in_data[0].size();
+
+    if (data_height < 1) {
+        throw std::runtime_error("invalid 'in_data' parameter, height is 0");
+        return false;   
+    }
 
     out_data.clear();
 

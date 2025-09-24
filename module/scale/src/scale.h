@@ -3,18 +3,18 @@
 
 #include <string>
 
-enum ScaleMode {
-  SCALE_MODE_FACTOR,
-  SCALE_MODE_EXPR,
-  SCALE_MODE_AGC,
-  SCALE_MODE_DIVERGE
+enum ScaleMethod {
+  SCALE_METHOD_FACTOR,
+  SCALE_METHOD_EXPR,
+  SCALE_METHOD_AGC,
+  SCALE_METHOD_DIVERGE
 };
 
 
 struct Scale {
   std::string attr_name;
   void* logger;
-  ScaleMode mode;
+  ScaleMethod method;
   float factor;
   float window_size;
   float dvg_a;

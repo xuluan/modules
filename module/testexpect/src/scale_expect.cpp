@@ -10,7 +10,7 @@
 
 
 bool exec_script(std::string const& script_file, int &err_code, std::string &err_msg) {
-    // const char* command = "./test/a.py";
+
 
     std::string command = script_file + " 2>&1";
 

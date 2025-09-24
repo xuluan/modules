@@ -2,55 +2,66 @@
 "version": "1.0.0",
 "use_mpi": false,
 "use_cuda": false,
-"factor": {
-  "required": false,
+"method": {
+  "required": true,
   "repeatable": false,
-  "type": "argument",
-  "help": "Apply constant or attribute-based scaling",
-  "value": {
-    "type": "argument",
-    "required": true,
-    "repetable": false,
-    "format": "float",
-    "help": "constant factor (e.g., 1.3, 5)"
-  }
-},
-"agc": {
-  "required": false,
-  "repeatable": false,
-  "type": "argument",
-  "help": "Apply AGC scaling",
-  "window_size": {
-    "type": "argument",
-    "required": true,
-    "repetable": false,
-    "format": "float",
-    "default": 500.0,
-    "help": "window length in ms (e.g., 500 ms)"
-  }
-},
-"diverge": {
-  "required": false,
-  "repeatable": false,
-  "type": "argument",
-  "help": "Apply divergence scaling",
-  "a": {
-    "type": "argument",
-    "required": true,
-    "repetable": false,
-    "format": "float",
-    "default": 2.0,
-    "help": "user-defined exponent (typically 1.0-2.0, default 2.0)"
-  },
-  "v": {
-    "type": "argument",
-    "required": true,
-    "repetable": false,
-    "format": "float",
-    "default": 1.0,
-    "help": "speed factor / magnification factor (default 1.0)"
-  }
+  "type": "option",
+  "help": "scaling method",
+  "options": [
+    {
+      "factor": {
+        "required": false,
+        "repeatable": false,
+        "type": "procedure",
+        "help": "Apply constant or attribute-based scaling",
+        "value": {
+          "type": "argument",
+          "required": true,
+          "repetable": false,
+          "format": "float",
+          "help": "constant factor (e.g., 1.3, 5)"
+        }
+      }    
+    },
+    {
+      "agc": {
+        "required": false,
+        "repeatable": false,
+        "type": "procedure",
+        "help": "Apply AGC scaling",
+        "window_size": {
+          "type": "argument",
+          "required": true,
+          "repetable": false,
+          "format": "float",
+          "default": 500.0,
+          "help": "window length in ms (e.g., 500 ms)"
+        }
+      }
+    },
+    {
+    "diverge": {
+        "required": false,
+        "repeatable": false,
+        "type": "procedure",
+        "help": "Apply divergence scaling",
+        "a": {
+          "type": "argument",
+          "required": true,
+          "repetable": false,
+          "format": "float",
+          "default": 2.0,
+          "help": "user-defined exponent (typically 1.0-2.0, default 2.0)"
+        },
+        "v": {
+          "type": "argument",
+          "required": true,
+          "repetable": false,
+          "format": "float",
+          "default": 1.0,
+          "help": "speed factor / magnification factor (default 1.0)"
+        }
+      }
+    }
+  ]
 }
-
-
-
