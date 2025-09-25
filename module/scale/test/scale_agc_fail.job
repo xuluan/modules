@@ -1,4 +1,5 @@
-# {pass: yes, timeout: 300}
+# {pass: no, timeout: 300, log: ["set agc.window_size with different value"]}
+# Test different input parameter  - should fail parsing
 - testgendata:
     version: '1.0.0'
     primarykey:
@@ -25,9 +26,8 @@
 - scale:
     version: '1.0.0'
     method:
-      - diverge:
-          a: 2.0           # Divergence Compensation Index
-          v: 1.0           # Velocity Coefficient
+      - agc:
+          window_size: 100         # In testexpect_scale.py, the value of 'window_size' is 500
 - testexpect:
     version: '1.0.0'
     primarykey:
@@ -47,4 +47,4 @@
       length: 1001
       unit: ms
       type: float
-      pattern: SCALE_DIVERGE
+      pattern: SCALE_AGC

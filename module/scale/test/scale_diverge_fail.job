@@ -1,4 +1,5 @@
-# {pass: yes, timeout: 300}
+# {pass: no, timeout: 300, log: ["set diverge.a with different value"]}
+# Test different input parameter  - should fail parsing
 - testgendata:
     version: '1.0.0'
     primarykey:
@@ -26,8 +27,8 @@
     version: '1.0.0'
     method:
       - diverge:
-          a: 2.0           # Divergence Compensation Index
-          v: 1.0           # Velocity Coefficient
+          a: 1.5           # In testexpect_scale.py, the value of 'a' is 2.0
+          v: 1.0
 - testexpect:
     version: '1.0.0'
     primarykey:

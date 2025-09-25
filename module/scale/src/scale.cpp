@@ -138,16 +138,26 @@ void scale_process(const char* myid)
     my_data->trc_len = job_df.GetDataVectorLength();
     my_data->trc_fmt = trc_fmt;
     my_data->trc_min = trc_min;
-    // gd_logger.LogInfo(my_logger, "{}-{}/{}", trc_max, trc_min, my_data->trc_len);
     my_data->sinterval = (trc_max-trc_min)/(my_data->trc_len -1);
 
+    bool ret;
 
     if (my_data->method == SCALE_METHOD_FACTOR) {
-        get_scale_data_factor(my_data);
+        ret = get_scale_data_factor(my_data);
     } else if (my_data->method == SCALE_METHOD_AGC) {
-        get_scale_data_agc(my_data);
+        ret = get_scale_data_agc(my_data);
     } else if (my_data->method == SCALE_METHOD_DIVERGE) {
-        get_scale_data_diverge(my_data);
+        ret = get_scale_data_diverge(my_data);
+    } else {
+        gd_logger.LogError(my_logger, "Unsupported method.");
+        job_df.SetJobAborted();
+        return;
+    }
+
+    if(!ret){
+        gd_logger.LogError(my_logger, "Failed to call scale method.");
+        job_df.SetJobAborted();
+        return;
     }
 
 }

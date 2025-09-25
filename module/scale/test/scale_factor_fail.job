@@ -1,3 +1,5 @@
+# {pass: no, timeout: 300, log: ["set factor.value with different value"]}
+# Test different input parameter  - should fail parsing
 # {pass: yes, timeout: 300}
 - testgendata:
     version: '1.0.0'
@@ -21,13 +23,13 @@
         random:
           type: float
           min: -1
-          max: 1
+          max: 1          
+    attribute:
 - scale:
     version: '1.0.0'
     method:
-      - diverge:
-          a: 2.0           # Divergence Compensation Index
-          v: 1.0           # Velocity Coefficient
+      - factor: 
+          value: 0.1              # In testexpect_scale.py, the value of 'value' is 0.5
 - testexpect:
     version: '1.0.0'
     primarykey:
@@ -47,4 +49,4 @@
       length: 1001
       unit: ms
       type: float
-      pattern: SCALE_DIVERGE
+      pattern: SCALE_FACTOR

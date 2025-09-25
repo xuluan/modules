@@ -9,7 +9,7 @@
 #include "scale.h"
 #include "scale_common.h"
 
-bool get_agc_data(
+void get_agc_data(
     const std::vector<std::vector<double>>& in_data, 
     float dt, 
     float window_size,
@@ -19,15 +19,13 @@ bool get_agc_data(
     size_t data_width = in_data.size();
 
     if (data_width < 1) {
-        throw std::runtime_error("invalid 'in_data' parameter, width is 0.");
-        return false;   
+        throw std::runtime_error("get_agc_data() failed: invalid 'in_data' parameter, width is 0.");
     }
 
     size_t data_height = in_data[0].size();
 
     if (data_height < 1) {
-        throw std::runtime_error("invalid 'in_data' parameter, height is 0");
-        return false;   
+        throw std::runtime_error("get_agc_data() failed: invalid 'in_data' parameter, height is 0");  
     }
     
     out_data.clear();
@@ -61,7 +59,6 @@ bool get_agc_data(
         out_data.push_back(trace);
     }
 
-    return true;
 }
 
 
@@ -86,21 +83,17 @@ bool get_scale_data_agc(Scale *my_data)
 
     std::vector<std::vector<double>> trc_orig, trc_agc;
 
-    // Converting trc_data to two-dimensional double array
+    
     try {
+        // Converting trc_data to two-dimensional double array
         conv_void_ptr_to_2d_double(trc_data, grp_size, trc_len, trc_fmt, trc_orig);
-    } catch (const std::exception& e) {
-        gd_logger.LogError(my_logger, e.what());
-        return false;
-    }
 
-    // call the AGC algorithm 
-    get_agc_data(trc_orig, my_data->sinterval, my_data->window_size, trc_agc);
+        // call the AGC algorithm 
+        get_agc_data(trc_orig, my_data->sinterval, my_data->window_size, trc_agc);
 
-    // Converting two-dimensional double array to trc_data
-    trc_data = my_data->trc_data;
-    try {
+        // Converting two-dimensional double array to trc_data
         conv_2d_double_to_void_ptr(trc_data, grp_size, trc_len, trc_fmt, trc_agc);
+
     } catch (const std::exception& e) {
         gd_logger.LogError(my_logger, e.what());
         return false;

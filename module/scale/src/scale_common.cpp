@@ -33,15 +33,16 @@ inline T safe_cast(double value) {
 }
 
 
-bool conv_void_ptr_to_2d_double(void* trc_data, size_t grp_size, size_t trc_len, as::DataFormat trc_fmt,
+void conv_void_ptr_to_2d_double(void* trc_data, size_t grp_size, size_t trc_len, as::DataFormat trc_fmt,
     std::vector<std::vector<double>>& out_data) 
 {
-    if (trc_data == nullptr) {
-        return false;
-    }
 
     std::vector<double> double_trc(grp_size*trc_len);
     double *double_trc_data;
+
+    if (trc_data == nullptr) {
+        throw std::runtime_error("conv_void_ptr_to_2d_double() failed: nullptr error of trc_data");
+    }
 
     double_trc_data = static_cast<double *>(double_trc.data());
     if (trc_fmt == as::DataFormat::FORMAT_U8) {
@@ -63,7 +64,7 @@ bool conv_void_ptr_to_2d_double(void* trc_data, size_t grp_size, size_t trc_len,
         double *trc = static_cast<double *>(trc_data);
         std::transform(trc, trc + grp_size * trc_len, double_trc_data, [](auto val) { return val; }); 
     } else {
-        throw std::runtime_error("data format is not supported");
+        throw std::runtime_error("conv_void_ptr_to_2d_double() failed: data format is not supported");
     }
 
     out_data.clear();
@@ -79,11 +80,9 @@ bool conv_void_ptr_to_2d_double(void* trc_data, size_t grp_size, size_t trc_len,
         out_data.push_back(trc_orig_item);
     }
 
-    return true;
-
 }
 
-bool conv_2d_double_to_void_ptr(void* trc_data, size_t grp_size, size_t trc_len, as::DataFormat trc_fmt,
+void conv_2d_double_to_void_ptr(void* trc_data, size_t grp_size, size_t trc_len, as::DataFormat trc_fmt,
     const std::vector<std::vector<double>>& in_data)
 {
 
@@ -92,14 +91,14 @@ bool conv_2d_double_to_void_ptr(void* trc_data, size_t grp_size, size_t trc_len,
     double_trc_data = static_cast<double *>(double_trc.data());
 
     if (trc_data == nullptr) {
-        throw std::runtime_error("nullptr error of trc_data");
+        throw std::runtime_error("conv_2d_double_to_void_ptr() failed: nullptr error of trc_data");
     }
 
     if (in_data.size() != grp_size || in_data.size()<1) {
-        throw std::runtime_error("invalid 'in_data' parameter");
+        throw std::runtime_error("conv_2d_double_to_void_ptr() failed: invalid 'in_data' parameter");
     }
     if (in_data[0].size() != trc_len) {
-        throw std::runtime_error("invalid 'in_data' parameter");
+        throw std::runtime_error("conv_2d_double_to_void_ptr() failed: invalid 'in_data' parameter");
     }
 
     // Converting two-dimensional array to one-dimensional array
@@ -134,9 +133,7 @@ bool conv_2d_double_to_void_ptr(void* trc_data, size_t grp_size, size_t trc_len,
         std::transform(double_trc_data, double_trc_data + grp_size * trc_len,
             trc, [](auto val) { return val; });
     } else {
-        throw std::runtime_error("data format is not supported");
-        return false;
+        throw std::runtime_error("conv_2d_double_to_void_ptr() failed: data format is not supported");
     }
 
-    return true;
 }

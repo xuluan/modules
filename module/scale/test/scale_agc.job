@@ -1,3 +1,4 @@
+# {pass: yes, timeout: 300}
 - testgendata:
     version: '1.0.0'
     primarykey:
