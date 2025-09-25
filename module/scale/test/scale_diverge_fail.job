@@ -1,4 +1,4 @@
-# {pass: no, timeout: 300, log: ["set diverge.a with different value"]}
+# {pass: no, timeout: 300, log: ["check data failed."]}
 # Test different input parameter  - should fail parsing
 - testgendata:
     version: '1.0.0'
