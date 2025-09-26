@@ -8,9 +8,7 @@
 #include "GeoDataFlow.h"
 #include <GdLogger.h>
 
-
 bool exec_script(std::string const& script_file, int &err_code, std::string &err_msg) {
-
 
     std::string command = script_file + " 2>&1";
 
@@ -45,13 +43,15 @@ bool check_data_scale_factor(Testexpect* my_data, std::string&  attr_name, AttrD
     void* dst = static_cast<void *> (attr_data.data);
 
     if( !dst) {
-        throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
+        gd_logger.LogError(my_data->logger, "check_data fail, attr '{}' got data is null ", attr_name);
+        return false;
     }
     
     const char* env_script_path = std::getenv("GEODELITY_TEST_SCRIPT_PATH");
 
     if (!env_script_path) {
-        throw std::runtime_error("check_data fail, 'GEODELITY_TEST_SCRIPT_PATH' is null");   
+        gd_logger.LogError(my_data->logger, "'GEODELITY_TEST_SCRIPT_PATH' is null");
+        return false;  
     }
 
     std::string script_file, script_cmd;
@@ -76,7 +76,7 @@ bool check_data_scale_factor(Testexpect* my_data, std::string&  attr_name, AttrD
     script_file = std::string(env_script_path) + "/testexpect_scale.py";
 
     if(!std::filesystem::exists(script_file)) {
-        throw std::runtime_error("check_data fail, " + script_file +  " does not exist");
+        gd_logger.LogError(my_data->logger, "script '{}' does not exist", script_file);
         return false;
     }
 
@@ -96,7 +96,8 @@ bool check_data_scale_factor(Testexpect* my_data, std::string&  attr_name, AttrD
     if( ret ){
         gd_logger.LogInfo(my_data->logger, "exec_script success: {}", err_msg);
     } else {
-        gd_logger.LogInfo(my_data->logger, "exec_script fail{}: {}", err_code, err_msg);
+        gd_logger.LogError(my_data->logger, "exec_script failed {}: {}", err_code, err_msg);
+        return false;
     }
 
     //read '.FCT' file and cmp data
@@ -106,11 +107,12 @@ bool check_data_scale_factor(Testexpect* my_data, std::string&  attr_name, AttrD
     ret = load_data(dst_data, attr_name + ".FCT", attr_data.length * as::get_data_format_size(attr_data.type));
 
     if(!ret) {
-        gd_logger.LogError(my_data->logger, "Load data faile, {}", attr_name + ".FCT");
+        gd_logger.LogError(my_data->logger, "Load data failed, {}", attr_name + ".FCT");
         return false;
     }
 
     if(std::memcmp(dst_data.data(), attr_data.data, attr_data.length * as::get_data_format_size(attr_data.type)) != 0) {
+        gd_logger.LogError(my_data->logger, "data comparison failed, {}", attr_name + ".FCT");
         return false;
     } else {
         return true;
@@ -126,13 +128,15 @@ bool check_data_scale_agc(Testexpect* my_data, std::string&  attr_name, AttrData
     void* dst = static_cast<void *> (attr_data.data);
 
     if( !dst) {
-        throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
+        gd_logger.LogError(my_data->logger, "check_data fail, attr '{}' got data is null ", attr_name);
+        return false;
     }
     
     const char* env_script_path = std::getenv("GEODELITY_TEST_SCRIPT_PATH");
 
     if (!env_script_path) {
-        throw std::runtime_error("check_data fail, 'GEODELITY_TEST_SCRIPT_PATH' is null");   
+        gd_logger.LogError(my_data->logger, "'GEODELITY_TEST_SCRIPT_PATH' is null");
+        return false;  
     }
 
     std::string script_file, script_cmd;
@@ -159,7 +163,7 @@ bool check_data_scale_agc(Testexpect* my_data, std::string&  attr_name, AttrData
     script_file = std::string(env_script_path) + "/testexpect_scale.py";
 
     if(!std::filesystem::exists(script_file)) {
-        throw std::runtime_error("check_data fail, " + script_file +  " does not exist");
+        gd_logger.LogError(my_data->logger, "script '{}' does not exist", script_file);
         return false;
     }
 
@@ -179,7 +183,8 @@ bool check_data_scale_agc(Testexpect* my_data, std::string&  attr_name, AttrData
     if( ret ){
         gd_logger.LogInfo(my_data->logger, "exec_script success: {}", err_msg);
     } else {
-        gd_logger.LogInfo(my_data->logger, "exec_script fail{}: {}", err_code, err_msg);
+        gd_logger.LogError(my_data->logger, "exec_script failed {}: {}", err_code, err_msg);
+        return false;
     }
 
     //read '.AGC' file and compare data
@@ -189,11 +194,12 @@ bool check_data_scale_agc(Testexpect* my_data, std::string&  attr_name, AttrData
     ret = load_data(dst_data, attr_name + ".AGC", attr_data.length * as::get_data_format_size(attr_data.type));
 
     if(!ret) {
-        gd_logger.LogError(my_data->logger, "Load data faile, {}", attr_name + ".AGC");
+        gd_logger.LogError(my_data->logger, "Load data failed, {}", attr_name + ".AGC");
         return false;
     }
 
     if(std::memcmp(dst_data.data(), attr_data.data, attr_data.length * as::get_data_format_size(attr_data.type)) != 0) {
+        gd_logger.LogError(my_data->logger, "data comparison failed, {}", attr_name + ".AGC");
         return false;
     } else {
         return true;
@@ -209,13 +215,15 @@ bool check_data_scale_diverge(Testexpect* my_data, std::string&  attr_name, Attr
     void* dst = static_cast<void *> (attr_data.data);
 
     if( !dst) {
-        throw std::runtime_error("check_data fail, attr " + attr_name + "got data is null ");
+        gd_logger.LogError(my_data->logger, "check_data fail, attr '{}' got data is null ", attr_name);
+        return false;
     }
     
     const char* env_script_path = std::getenv("GEODELITY_TEST_SCRIPT_PATH");
 
     if (!env_script_path) {
-        throw std::runtime_error("check_data fail, 'GEODELITY_TEST_SCRIPT_PATH' is null");   
+        gd_logger.LogError(my_data->logger, "'GEODELITY_TEST_SCRIPT_PATH' is null");
+        return false;
     }
 
     std::string script_file, script_cmd;
@@ -242,7 +250,7 @@ bool check_data_scale_diverge(Testexpect* my_data, std::string&  attr_name, Attr
     script_file = std::string(env_script_path) + "/testexpect_scale.py";
 
     if(!std::filesystem::exists(script_file)) {
-        throw std::runtime_error("check_data fail, " + script_file +  " does not exist");
+        gd_logger.LogError(my_data->logger, "script '{}' does not exist", script_file);
         return false;
     }
 
@@ -264,7 +272,8 @@ bool check_data_scale_diverge(Testexpect* my_data, std::string&  attr_name, Attr
     if( ret ){
         gd_logger.LogInfo(my_data->logger, "exec_script success: {}", err_msg);
     } else {
-        gd_logger.LogInfo(my_data->logger, "exec_script fail{}: {}", err_code, err_msg);
+        gd_logger.LogError(my_data->logger, "exec_script failed {}: {}", err_code, err_msg);
+        return false;
     }
 
     //read '.DVG' file and compare data
@@ -274,11 +283,12 @@ bool check_data_scale_diverge(Testexpect* my_data, std::string&  attr_name, Attr
     ret = load_data(dst_data, attr_name + ".DVG", attr_data.length * as::get_data_format_size(attr_data.type));
 
     if(!ret) {
-        gd_logger.LogError(my_data->logger, "Load data faile, {}", attr_name + ".DVG");
+        gd_logger.LogError(my_data->logger, "Load data failed, {}", attr_name + ".DVG");
         return false;
     }
 
     if(std::memcmp(dst_data.data(), attr_data.data, attr_data.length * as::get_data_format_size(attr_data.type)) != 0) {
+        gd_logger.LogError(my_data->logger, "data comparison failed, {}", attr_name + ".DVG");
         return false;
     } else {
         return true;
