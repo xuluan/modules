@@ -114,7 +114,7 @@ void attrcalc_init(const char* myid, const char* buf)
 
 
         //parser expr
-        ExpressionParser parser;
+        gutl::ExpressionParser parser;
         bool success = parser.parse(my_data->expr, variables, my_data->expression);
         if(!success) {
             throw std::runtime_error(parser.get_errors());
@@ -182,7 +182,7 @@ void attrcalc_process(const char* myid)
         int grp_size = job_df.GetGroupSize();
 
         // setup attributes
-        std::map<std::string, AttrData> variables;
+        std::map<std::string, gutl::AttrData> variables;
 
         const char* attr_name;
         int length;
@@ -190,7 +190,7 @@ void attrcalc_process(const char* myid)
         float min;
         float max;
         void* data;
-        AttrData attr_data;
+        gutl::AttrData attr_data;
 
         for(int i = 0; i< job_df.GetNumAttributes(); i++) {
             attr_name = job_df.GetAttributeName(i);
@@ -202,9 +202,9 @@ void attrcalc_process(const char* myid)
 
         std::vector<double> result_data;
         result_data.resize(length * grp_size);
-        AttrData result_attr = {result_data.data(), (size_t)length * grp_size, as::DataFormat::FORMAT_R64};
+        gutl::AttrData result_attr = {result_data.data(), (size_t)length * grp_size, as::DataFormat::FORMAT_R64};
 
-        ExpressionEvaluator evaluator;
+        gutl::ExpressionEvaluator evaluator;
         bool success = evaluator.evaluate(my_data->expression, variables, &result_attr);
         if(!success) {
             throw std::runtime_error(evaluator.get_errors());

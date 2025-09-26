@@ -4,8 +4,6 @@ project(mute)
 
 add_library(mute STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/mute.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/vector_operations.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/expression_parser.cpp
 )
 
 target_compile_features(mute PRIVATE cxx_std_17)
@@ -55,5 +53,7 @@ install(TARGETS
 
 install(FILES
   src/mute.json
+  README.md
+  CHANGELOG.md  
   DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

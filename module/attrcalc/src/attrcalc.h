@@ -11,8 +11,8 @@ struct Attrcalc {
     std::string type;
     std::string action;
     std::string expr;
-    ExpressionTree expression;
-    AttrData attr_data;
+    gutl::ExpressionTree expression;
+    gutl::AttrData attr_data;
     void* logger;
 };
 

@@ -99,7 +99,7 @@ void mute_init(const char* myid, const char* buf)
             }
 
             //parse the expression
-            gexpr::ExpressionParser parser;
+            gutl::ExpressionParser parser;
             bool success = parser.parse(my_data->threshold_expr, variables, my_data->expression);
             if(!success) {
                 throw std::runtime_error(parser.get_errors());
@@ -167,7 +167,7 @@ void mute_process(const char* myid)
         if (my_data->expr_enable) {
 
             // Calculate the threshold according to the expression.
-            std::map<std::string, gexpr::AttrData> variables;
+            std::map<std::string, gutl::AttrData> variables;
 
             const char* attr_name;
             int length;
@@ -175,9 +175,9 @@ void mute_process(const char* myid)
             float min;
             float max;
             void* data;
-            gexpr::AttrData attr_data;
+            gutl::AttrData attr_data;
             std::vector<double> result_data(grp_size);
-            gexpr::AttrData result_attr = {result_data.data(), (size_t)grp_size, as::DataFormat::FORMAT_R64};
+            gutl::AttrData result_attr = {result_data.data(), (size_t)grp_size, as::DataFormat::FORMAT_R64};
 
             for(int i = 0; i< job_df.GetNumAttributes(); i++) {
                 attr_name = job_df.GetAttributeName(i);
@@ -187,7 +187,7 @@ void mute_process(const char* myid)
                 variables[attr_name] = attr_data;
             }
 
-            gexpr::ExpressionEvaluator evaluator;
+            gutl::ExpressionEvaluator evaluator;
             bool success = evaluator.evaluate(my_data->expression, variables, &result_attr);
             
             if(!success) {
@@ -196,7 +196,7 @@ void mute_process(const char* myid)
 
             // Convert data type to float
             attr_data = {threshold_values.data(),  (size_t)grp_size, as::DataFormat::FORMAT_R32};
-            gexpr::convert_vector(&attr_data, &result_attr);
+            gutl::convert_vector(&attr_data, &result_attr);
 
             // std::transform(result_data.begin(), result_data.end(), threshold_values.begin(),
             //      [](auto val) { return int(val); }); 
@@ -318,15 +318,15 @@ void mute_process(const char* myid)
         // Multiply the two arrays to obtain the result:  'TRACE_DATA * FACTOR'
 
         std::vector<double> mute_result_data(grp_size*trc_length);
-        gexpr::AttrData mute_result_attr = {mute_result_data.data(), (size_t)trc_length*grp_size, as::DataFormat::FORMAT_R64};
+        gutl::AttrData mute_result_attr = {mute_result_data.data(), (size_t)trc_length*grp_size, as::DataFormat::FORMAT_R64};
 
         // Use vector_compute() to compute the result
         
-        gexpr::AttrData mute_attr_data_trc, mute_attr_data_factor, mute_attr_data;
+        gutl::AttrData mute_attr_data_trc, mute_attr_data_factor, mute_attr_data;
         mute_attr_data_trc = {job_df.GetWritableBuffer(trc_name.c_str()),  (size_t)grp_size * trc_length, trc_fmt};
         mute_attr_data_factor = {mute_factors.data(), (size_t)grp_size * trc_length, as::DataFormat::FORMAT_R32};
         bool mute_success;
-        mute_success = gexpr::vector_compute(gexpr::AttributeOp::OP_MUL,
+        mute_success = gutl::vector_compute(gutl::AttributeOp::OP_MUL,
             &mute_result_attr, &mute_attr_data_trc, &mute_attr_data_factor);
         if(!mute_success) {
             throw std::runtime_error("vector compute failed!");
@@ -345,7 +345,7 @@ void mute_process(const char* myid)
 #endif
         // data type convert
         mute_attr_data = {job_df.GetWritableBuffer(trc_name.c_str()),  (size_t)grp_size * trc_length, trc_fmt};
-        gexpr::convert_vector(&mute_attr_data, &mute_result_attr);
+        gutl::convert_vector(&mute_attr_data, &mute_result_attr);
 
 
         gd_logger.LogInfo(my_logger, "Process primary key {} finished.", pkey[0]);

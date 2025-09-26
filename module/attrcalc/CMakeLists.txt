@@ -4,8 +4,6 @@ project(attrcalc)
 
 add_library(attrcalc STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/attrcalc.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/vector_operations.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/expression_parser.cpp
 )
 
 target_compile_features(attrcalc PRIVATE cxx_std_17)
